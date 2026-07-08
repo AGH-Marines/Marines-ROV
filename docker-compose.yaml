@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  rov-ros2-dev:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        USERNAME: dev
+        UID: 1000
+        GID: 1000
+    image: rov_ros2_dev_image
+    container_name: pycharm_rov_ros2
+    user: dev
+    working_dir: /home/dev/ros2_ws
+
+    # Utrzymanie kontenera przy życiu dla PyCharma
+    command: sleep infinity
+
+    privileged: true
+    network_mode: "host"
+
+    cap_add:
+      - SYS_PTRACE
+
+    security_opt:
+      - seccomp:unconfined
+      - apparmor:unconfined
+
+    device_cgroup_rules:
+      - 'c *:* rmw'
+
+    volumes:
+      # Mapowanie przestrzeni roboczej
+      - .:/home/dev/ros2_ws:rw
+      # Mapowanie urządzeń (dla ROS2/ROV)
+      - /dev:/dev:rw
+      # Konfiguracja GUI (X11)
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      # - ~/.Xauthority:/home/dev/.Xauthority:rw # Odkomentuj w razie problemów z uprawnieniami GUI
+
+    environment:
+      - DISPLAY=${DISPLAY}
+      - XAUTHORITY=/home/dev/.Xauthority
+      - PYTHONPATH=src:install/lib/python3.10/site-packages
+      # Zmienne środowiskowe dla NVIDIA
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+
+    # Sekcja przekazywania GPU (zastępuje --gpus all z runArgs)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
