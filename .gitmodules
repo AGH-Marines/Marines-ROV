@@ -1,3 +1,3 @@
-[submodule "src/stonefish_ros2"]
-	path = src/stonefish_ros2
+[submodule "src/simulation/stonefish_ros2"]
+	path = src/simulation/stonefish_ros2
 	url = https://github.com/AGH-Marines/stonefish_ros2.git

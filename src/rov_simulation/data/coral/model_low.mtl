@@ -1,0 +1,155 @@
+# Blender 4.4.0 MTL File: 'None'
+# www.blender.org
+
+newmtl CHEST
+Ns 20.000006
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 1
+map_Kd /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/chest.jpg
+map_Bump -bm 1.000000 /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/chest_norm.jpg
+
+newmtl Material_#4774
+Ns 20.000006
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 1
+map_Kd /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/grass_long_diffuse.jpg
+map_d /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/grass_long_alpha.jpg
+
+newmtl Material_#5017
+Ns 20.000006
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 1
+map_Kd /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/cannon.jpg
+map_Bump -bm 0.300000 /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/cannon_norm.jpg
+
+newmtl Material_#5536
+Ns 20.000006
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 1
+map_Kd /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/rock_pltes_2_diffuse.jpg
+map_Bump -bm 0.800000 /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/rock_pltes_2_norm.jpg
+
+newmtl Material_#5539
+Ns 20.000006
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 1
+map_Kd /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/floor_modul_2_diffuse.jpg
+map_Bump -bm 0.300000 /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/floor_modul_2_norm.jpg
+
+newmtl Material_#5540
+Ns 20.000006
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 1
+map_Kd /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/mackowy_diffuse.jpg
+map_Bump -bm 0.300000 /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/mackowy_norm.jpg
+
+newmtl Material_#5541
+Ns 20.000006
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 1
+map_Kd /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/tree_like_diffuse.jpg
+map_Bump -bm 0.300000 /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/tree_like_norm.jpg
+
+newmtl Material_#5542
+Ns 20.000006
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 1
+map_Kd /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/paluszki_1_diffuse.jpg
+map_Bump -bm 0.300000 /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/paluszki_1_norm.jpg
+
+newmtl Material_#5543
+Ns 20.000006
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 1
+map_Kd /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/paluszki_2_diffuse.jpg
+map_Bump -bm 0.300000 /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/paluszki_2_norm.jpg
+
+newmtl Material_#5544
+Ns 20.000006
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 1
+map_Kd /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/north_rock_diffuse.jpg
+map_Bump -bm 0.800000 /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/north_rock_norm.jpg
+
+newmtl Material_#5545
+Ns 20.000006
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 1
+map_Kd /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/maczuga_heraklesa_diff.jpg
+map_Bump -bm 0.900000 /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/maczuga_heraklesa_norm.jpg
+
+newmtl Material_#5548
+Ns 20.000006
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 1
+map_Kd /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/cobble_diff.jpg
+map_d /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/cobble_masken.jpg
+map_Bump -bm 0.300000 /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/cobble_norm.jpg
+
+newmtl default
+Ns 20.000006
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 1
+map_Kd /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/pilar_rock_diffuse.jpg
+map_Bump -bm 1.000000 /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/pilar_rock_norm.jpg
+
+newmtl wood_planked
+Ns 20.000006
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 1
+map_Kd /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/wood_ship.jpg
+map_Bump -bm 2.000000 /home/piotr/Downloads/underwater-environment/source/Underwater environment 2/wood-planks1_norm.jpg

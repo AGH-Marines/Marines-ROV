@@ -45,21 +45,34 @@ RUN apt-get update \
     iputils-ping \
     fzf \
     python3-pip \
+    python3-scipy \
     wget \
     libgeographic-dev \
     mesa-utils \
     && rm -rf /ver/lib/apt/lists/*
 
 # Download ROS2 packages
+# ros-$ROS_DISTRO-diagnostic-updater jest wymieniony jawnie (a nie tylko dociągany
+# tranzytywnie przez robot-localization), bo w praktyce zdarzało się, że apt dobierał
+# do niego starszą wersję niż ta, z którą został zbudowany robot_localization, co
+# kończyło się błędem "libdiagnostic_updater.so: cannot open shared object file"
+# przy starcie ekf_node. Jawne żądanie najnowszej wersji w tej samej transakcji apt
+# ogranicza ryzyko takiego rozjazdu.
 RUN apt-get update \
     && apt-get install -y \
     ros-$ROS_DISTRO-joint-state-publisher \
     ros-$ROS_DISTRO-joint-state-publisher-gui\
     ros-$ROS_DISTRO-tf-transformations \
+    ros-$ROS_DISTRO-diagnostic-updater \
+    ros-$ROS_DISTRO-robot-localization \
     ros-$ROS_DISTRO-imu-tools \
     ros-$ROS_DISTRO-plotjuggler-ros \
     ros-$ROS_DISTRO-py-trees \
-    ros-$ROS_DISTRO-py-trees-ros
+    ros-$ROS_DISTRO-py-trees-ros \
+    ros-$ROS_DISTRO-octomap-server \
+    ros-$ROS_DISTRO-octomap-msgs \
+    ros-$ROS_DISTRO-joy \
+    ros-$ROS_DISTRO-teleop-twist-joy
 
 USER root
 
