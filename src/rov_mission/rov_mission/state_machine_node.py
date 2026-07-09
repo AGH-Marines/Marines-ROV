@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+import rclpy
+import py_trees
+import py_trees_ros
+
+from rov_mission.behaviors import (
+    CaptureHomePose, ArmThrusters, DiveToDepth, StartMapping, PublishGoal, MonitorMission,
+)
+
+
+def create_root(node) -> py_trees.behaviour.Behaviour:
+    goal_x = node.get_parameter('goal.x').value
+    goal_y = node.get_parameter('goal.y').value
+    goal_z = node.get_parameter('goal.z').value
+    goal_yaw = node.get_parameter('goal.yaw').value
+
+    root = py_trees.composites.Sequence(name="MissionRoot", memory=True)
+
+    go_to_goal = py_trees.composites.Sequence(name="GoToGoal", memory=True)
+    go_to_goal.add_children([
+        PublishGoal(name="PublishGoal", static_goal=(goal_x, goal_y, goal_z, goal_yaw)),
+        MonitorMission(name="MonitorGoalApproach"),
+    ])
+
+    return_home = py_trees.composites.Sequence(name="ReturnHome", memory=True)
+    return_home.add_children([
+        PublishGoal(name="PublishHomeGoal", key="home_pose"),
+        MonitorMission(name="MonitorReturnHome"),
+    ])
+
+    root.add_children([
+        CaptureHomePose(),
+        ArmThrusters(),
+        DiveToDepth(target_z=node.get_parameter('cruise_depth').value),
+        StartMapping(),
+        go_to_goal,
+        return_home,
+    ])
+    return root
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = rclpy.create_node('mission_params_node')
+    node.declare_parameter('map_frame', 'odom')
+    node.declare_parameter('base_frame', 'base_link')
+    node.declare_parameter('cruise_depth', 1.5)
+    node.declare_parameter('goal.x', 3.0)
+    node.declare_parameter('goal.y', 3.0)
+    node.declare_parameter('goal.z', 1.5)
+    node.declare_parameter('goal.yaw', 0.0)
+
+    root = create_root(node)
+    tree = py_trees_ros.trees.BehaviourTree(root=root)
+    try:
+        tree.setup(node=node, timeout=15.0)
+    except Exception as exc:
+        node.get_logger().error(f'Inicjalizacja drzewa zachowań nie powiodła się: {exc}')
+        rclpy.shutdown()
+        return
+
+    tree.tick_tock(period_ms=200.0)
+    # tick_tock() tylko tworzy timer rclpy.Timer i wraca od razu — samo tikowanie
+    # drzewa odbywa się w callbackach timera podczas spin(), więc trzeba tu spinować.
+    try:
+        rclpy.spin(node)
+    except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
+        pass
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()
