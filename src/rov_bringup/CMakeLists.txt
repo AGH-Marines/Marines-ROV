@@ -12,6 +12,7 @@ install(DIRECTORY
   launch
   rviz
   config
+  urdf
   DESTINATION share/${PROJECT_NAME}/
 )
 ament_package()

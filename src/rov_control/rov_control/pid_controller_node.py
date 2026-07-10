@@ -46,7 +46,7 @@ class PIDControllerNode(Node):
         self.declare_parameter('map_frame', 'odom')
         self.declare_parameter('base_frame', 'base_link')
         self.declare_parameter('control_rate', 20.0)
-        self.declare_parameter('default_depth', -1.0)
+        self.declare_parameter('default_depth', -2.0)
         self.declare_parameter('default_yaw', 0.0)
         self.declare_parameter('xy_deadzone', 0.05)
         self.declare_parameter('xy_force_scale', 40.0)
@@ -66,13 +66,13 @@ class PIDControllerNode(Node):
         self.create_subscription(Path, '/marines_rov/global_path', self.path_callback, 10)
 
         # Regulatory dla wszystkich 6 stopni swobody
-        self.pid_x = PID(4.0, 0.0, 2.0, out_limit=60.0)
-        self.pid_y = PID(4.0, 0.0, 2.0, out_limit=60.0)
+        self.pid_x = PID(6.0, 0.1, 1.0, out_limit=60.0)
+        self.pid_y = PID(6.0, 0.1, 1.0, out_limit=60.0)
         self.pid_z = PID(5.0, 0.1, 0.5, out_limit=60.0)
 
         # Aktywna stabilizacja poziomu (Roll/Pitch docelowo zawsze 0.0)
-        self.pid_roll = PID(15.0, 0.5, 5.0, out_limit=40.0)
-        self.pid_pitch = PID(15.0, 0.5, 5.0, out_limit=40.0)
+        self.pid_roll = PID(15.0, 0.5, 2.0, out_limit=40.0)
+        self.pid_pitch = PID(15.0, 0.5, 2.0, out_limit=40.0)
         self.pid_yaw = PID(1.8, 0.05, 0.8, out_limit=30.0)
 
         self.hold_x = None
@@ -101,6 +101,11 @@ class PIDControllerNode(Node):
         self.path_index = 0
         self.pid_x.reset()
         self.pid_y.reset()
+        # Wyczyść zapamiętaną pozycję/kurs trzymania - inaczej po zakończeniu tej
+        # trasy robot próbowałby wrócić do miejsca sprzed jej rozpoczęcia zamiast
+        # zostać tam, gdzie faktycznie dopłynął.
+        self.hold_x = None
+        self.hold_y = None
         self.get_logger().info(f'Nowa ścieżka: {len(self.path)} punktów.')
 
     def get_current_pose(self):
@@ -128,22 +133,27 @@ class PIDControllerNode(Node):
 
         if self.path and self.path_index < len(self.path):
             target = self.path[self.path_index].pose.position
-            dist = math.hypot(target.x - cx, target.y - cy)
+            dist = math.sqrt((target.x - cx) ** 2 + (target.y - cy) ** 2 + (target.z - cz) ** 2)
             if dist < self.get_parameter('goal_tolerance').value:
                 self.path_index += 1
                 if self.path_index >= len(self.path):
                     self.path_complete_pub.publish(Bool(data=True))
+                    print("GOAL", flush=True)
 
             if self.path_index < len(self.path):
                 target = self.path[self.path_index].pose.position
                 sp_x, sp_y, sp_z = target.x, target.y, target.z
-                q = self.path[self.path_index].pose.orientation
-                _, _, sp_yaw = euler_from_quaternion([q.x, q.y, q.z, q.w])
+                # Celowo liczymy namiar na bieżąco (do aktualnego celu z aktualnej
+                # pozycji), a nie bierzemy orientacji zapisanej w trasie przy jej
+                # generowaniu - dzięki temu dziób (i czujniki) cały czas są
+                # skierowane w stronę, w którą robot faktycznie płynie.
+                sp_yaw = math.atan2(sp_y - cy, sp_x - cx)
             else:
                 sp_x, sp_y, sp_z, sp_yaw = cx, cy, self.hold_z, self.hold_yaw
 
             force_x = self.pid_x.update(sp_x - cx, dt)
             force_y = self.pid_y.update(sp_y - cy, dt)
+            force_in_body_frame = False
         else:
             self.path_complete_pub.publish(Bool(data=False))
             twist = self.last_cmd_vel
@@ -152,17 +162,25 @@ class PIDControllerNode(Node):
 
             if stale or (abs(twist.linear.x) < deadzone and abs(twist.linear.y) < deadzone):
                 if self.hold_x is None:
+                    # Zapamiętaj aktualną pozycję I kurs w momencie wejścia w tryb
+                    # trzymania pozycji - inaczej hold_yaw zostaje na domyślnym
+                    # default_yaw (0.0) i robot obraca się z powrotem do zera
+                    # świata zamiast trzymać kierunek, w którym właśnie płynął.
                     self.hold_x, self.hold_y = cx, cy
+                    self.hold_yaw = cyaw
                 force_x = self.pid_x.update(self.hold_x - cx, dt)
                 force_y = self.pid_y.update(self.hold_y - cy, dt)
+                force_in_body_frame = False
             else:
                 self.hold_x = None
                 self.hold_y = None
                 self.pid_x.reset()
                 self.pid_y.reset()
                 scale = self.get_parameter('xy_force_scale').value
+                # cmd_vel jest już w ramie ciała (konwencja teleopu) - nie obracać.
                 force_x = twist.linear.x * scale
                 force_y = twist.linear.y * scale
+                force_in_body_frame = True
 
             if not stale:
                 if abs(twist.linear.z) > deadzone:
@@ -184,9 +202,20 @@ class PIDControllerNode(Node):
         yaw_error = normalize_angle(sp_yaw - cyaw)
         torque_z = self.pid_yaw.update(yaw_error, dt)
 
+        # force_x/force_y z PID-ów pozycji są policzone w osiach świata (błąd
+        # pozycji X/Y), a thruster_allocator_node oczekuje siły w ramie ciała
+        # robota - trzeba obrócić o bieżący yaw, inaczej robot pcha się w
+        # kierunku świata zamiast przed siebie, nawet gdy dziób jest już
+        # skierowany na cel. cmd_vel z teleopu jest już w ramie ciała.
+        if force_in_body_frame:
+            body_force_x, body_force_y = force_x, force_y
+        else:
+            body_force_x = force_x * math.cos(cyaw) + force_y * math.sin(cyaw)
+            body_force_y = -force_x * math.sin(cyaw) + force_y * math.cos(cyaw)
+
         wrench_msg = Wrench()
-        wrench_msg.force.x = force_x
-        wrench_msg.force.y = force_y
+        wrench_msg.force.x = body_force_x
+        wrench_msg.force.y = body_force_y
         wrench_msg.force.z = force_z
         wrench_msg.torque.x = torque_x
         wrench_msg.torque.y = torque_y

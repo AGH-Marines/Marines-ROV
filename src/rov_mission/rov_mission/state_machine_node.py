@@ -44,10 +44,10 @@ def main(args=None):
     node = rclpy.create_node('mission_params_node')
     node.declare_parameter('map_frame', 'odom')
     node.declare_parameter('base_frame', 'base_link')
-    node.declare_parameter('cruise_depth', 1.5)
+    node.declare_parameter('cruise_depth', -1.5)
     node.declare_parameter('goal.x', 3.0)
     node.declare_parameter('goal.y', 3.0)
-    node.declare_parameter('goal.z', 1.5)
+    node.declare_parameter('goal.z', -1.5)
     node.declare_parameter('goal.yaw', 0.0)
 
     root = create_root(node)

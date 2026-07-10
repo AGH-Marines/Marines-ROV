@@ -40,49 +40,56 @@
         <dimensions xyz="0.2 10.0 4.0"/>
         <material name="Rock"/>
         <look name="wall_color"/>
-        <world_transform rpy="0.0 0.0 0.0" xyz="5.0 0.0 2.0"/>
+        <world_transform rpy="0.0 0.0 0.0" xyz="26.0 0.0 2.0"/>
     </static>
 
     <static name="WallSouth" type="box">
         <dimensions xyz="0.2 10.0 4.0"/>
         <material name="Rock"/>
         <look name="wall_color"/>
-        <world_transform rpy="0.0 0.0 0.0" xyz="-5.0 0.0 2.0"/>
+        <world_transform rpy="0.0 0.0 0.0" xyz="-1.0 0.0 2.0"/>
     </static>
 
     <static name="WallEast" type="box">
-        <dimensions xyz="10.0 0.2 4.0"/>
+        <dimensions xyz="28.0 0.2 4.0"/>
         <material name="Rock"/>
         <look name="wall_color"/>
-        <world_transform rpy="0.0 0.0 0.0" xyz="0.0 5.0 2.0"/>
+        <world_transform rpy="0.0 0.0 0.0" xyz="13.0 5.0 2.0"/>
     </static>
 
     <static name="WallWest" type="box">
-        <dimensions xyz="10.0 0.2 4.0"/>
+        <dimensions xyz="28.0 0.2 4.0"/>
         <material name="Rock"/>
         <look name="wall_color"/>
-        <world_transform rpy="0.0 0.0 0.0" xyz="0.0 -5.0 2.0"/>
+        <world_transform rpy="0.0 0.0 0.0" xyz="13.0 -5.0 2.0"/>
     </static>
 
     <static name="Obstacle1" type="box">
-        <dimensions xyz="1.0 1.0 1.0"/>
+        <dimensions xyz="0.5 3 4.0"/>
         <material name="Rock"/>
         <look name="box_red"/>
-        <world_transform rpy="0.0 0.0 0.78" xyz="2.0 2.0 3.5"/>
+        <world_transform rpy="0.0 0.0 0.0" xyz="4.0 0.0 2"/>
     </static>
 
     <static name="Obstacle2" type="box">
-        <dimensions xyz="0.5 0.5 2.5"/>
+        <dimensions xyz="4 0.5 4"/>
         <material name="Rock"/>
         <look name="box_green"/>
-        <world_transform rpy="0.0 0.0 0.0" xyz="-2.5 1.5 2.75"/>
+        <world_transform rpy="0.0 0.0 0.0" xyz="7 3.5 2"/>
     </static>
 
     <static name="Obstacle3" type="box">
-        <dimensions xyz="3.0 0.5 0.5"/>
+        <dimensions xyz="0.5 5 4"/>
         <material name="Rock"/>
         <look name="box_yellow"/>
-        <world_transform rpy="0.0 0.0 0.5" xyz="0.0 -2.5 3.75"/>
+        <world_transform rpy="0.0 0.0 0.5" xyz="12.0 1 2"/>
+    </static>
+
+    <static name="Obstacle3" type="box">
+        <dimensions xyz="0.5 5 4"/>
+        <material name="Rock"/>
+        <look name="box_yellow"/>
+        <world_transform rpy="0.0 0.0 0" xyz="6.0 -2.5 2"/>
     </static>
 
     <robot name="ROV" fixed="false" self_collisions="false">
@@ -90,7 +97,7 @@
           <external_part name="HullBottom" type="model" physics="submerged" buoyant="true">
              <physical>
                 <mesh filename="new_robot/new_robot.obj" scale="0.1"/>
-                <origin rpy="3.14 0.0 -1.570796" xyz="0.0 0.0 0.0"/>
+                <origin rpy="3.14 0.0 -1.570796" xyz="0.0 0.0 0"/>
                 <thickness value="0.0025"/>
              </physical>
              <mass value="10.0" />
@@ -239,7 +246,6 @@
        </actuator>
 
        <sensor name="odometry" type="odometry" rate="100.0">
-          <noise position="0.05" velocity="0.01" angle="0.1" angular_velocity="0.05"/>
           <link name="base_link"/>
           <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
           <ros_publisher topic="/marines_rov/odometry"/>
@@ -254,25 +260,25 @@
 
         <sensor name="zed_camera" type="camera" rate="15.0">
           <link name="base_link"/>
-          <origin rpy="0.0 0.0 0.0" xyz="0.2 0.0 0.0"/>
+          <origin rpy="0.0 0.0 0.0" xyz="0.35 0.0 0.0"/>
           <specs resolution_x="640" resolution_y="480" horizontal_fov="75.0"/>
           <ros_publisher topic="/marines_rov/zed"/>
        </sensor>
         <sensor name="zed_left" type="camera" rate="15.0">
           <link name="base_link"/>
-          <origin rpy="0.0 0.0 0.0" xyz="0.2 0.06 0.0"/>
+          <origin rpy="0.0 0.0 0.0" xyz="0.35 0.06 0.0"/>
           <specs resolution_x="640" resolution_y="480" horizontal_fov="75.0"/>
           <ros_publisher topic="/marines_rov/zed/left"/>
        </sensor>
         <sensor name="multibeam_3d" rate="15.0" type="multibeam2d">
           <link name="base_link"/>
-          <origin rpy="0.0 0.0 0.0" xyz="0.2 0.0 0.0"/>
-          <specs resolution_x="256" resolution_y="64" horizontal_fov="120.0" vertical_fov="20.0" range_min="0.5" range_max="15.0"/>
+          <origin rpy="0.0 0.0 0.0" xyz="0.35 0.0 0.0"/>
+          <specs resolution_x="256" resolution_y="64" horizontal_fov="120.0" vertical_fov="20.0" range_min="0.5" range_max="50.0"/>
           <ros_publisher topic="/marines_rov/point_cloud"/>
        </sensor>
        <sensor name="zed_right" type="camera" rate="15.0">
           <link name="base_link"/>
-          <origin rpy="0.0 0.0 0.0" xyz="0.2 -0.06 0.0"/>
+          <origin rpy="0.0 0.0 0.0" xyz="0.35 -0.06 0.0"/>
           <specs resolution_x="640" resolution_y="480" horizontal_fov="75.0"/>
           <ros_publisher topic="/marines_rov/zed/right"/>
        </sensor>

@@ -26,6 +26,7 @@ setup(
             "stm32 = rov_bridge.stm32_node:main",
             "uard = rov_bridge.uard_node:main",
             'dvl_converter = rov_bridge.dvl_converter_node:main',
+            'odometry_converter = rov_bridge.odometry_converter_node:main',
         ],
     },
 )

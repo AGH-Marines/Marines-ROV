@@ -67,7 +67,7 @@ class ArmThrusters(py_trees.behaviour.Behaviour):
 
 
 class DiveToDepth(py_trees.behaviour.Behaviour):
-    def __init__(self, name="DiveToTargetDepth", target_z=1.5, tolerance=0.15):
+    def __init__(self, name="DiveToTargetDepth", target_z=-1.5, tolerance=0.15):
         super().__init__(name)
         self.target_z = target_z
         self.tolerance = tolerance

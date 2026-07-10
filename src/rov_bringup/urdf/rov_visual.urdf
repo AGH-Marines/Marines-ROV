@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<robot name="rov_visual">
+  <!--
+    Wyłącznie wizualny szkielet ROV-a do RViz (nie ma żadnej fizyki/kolizji).
+    Wszystko wisi na "base_link", żeby nie tworzyć dodatkowych ramek TF
+    kolidujących z tymi już publikowanymi przez Stonefish/static_transform_publisher.
+  -->
+  <link name="base_link">
+    <!-- Przybliżony kadłub (bounding box na podstawie rozstawu silników w underwater_world.scn) -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.53 0.42 0.25"/>
+      </geometry>
+      <material name="hull_gray">
+        <color rgba="0.6 0.6 0.6 0.35"/>
+      </material>
+    </visual>
+
+    <!-- Kamera / multibeam (wspólne miejsce montażu, xyz="0.35 0 0" jak w underwater_world.scn) -->
+    <visual>
+      <origin xyz="0.35 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.04 0.08 0.04"/>
+      </geometry>
+      <material name="camera_yellow">
+        <color rgba="1.0 0.8 0.0 1.0"/>
+      </material>
+    </visual>
+
+    <!-- Strzałka kierunku patrzenia kamery (+X od kamery) -->
+    <visual>
+      <origin xyz="0.5 0 0" rpy="0 1.5707963 0"/>
+      <geometry>
+        <cylinder radius="0.008" length="0.3"/>
+      </geometry>
+      <material name="boresight_red">
+        <color rgba="1.0 0.0 0.0 1.0"/>
+      </material>
+    </visual>
+  </link>
+</robot>

@@ -10,8 +10,19 @@ ekf_filter_node:
     base_link_frame: base_link
     world_frame: odom
 
-    # 1. Odometria kinematyczna ze Stonefisha
-    odom0: /marines_rov/odometry
+    # Musi odpowiadać <world_transform> robota "ROV" w underwater_world.scn (X, Y bez
+    # zmian, Z ze znakiem minus - patrz odometry_converter_node.py). Bez tego EKF zakłada
+    # start w (0,0,0), a gdy przyjdzie pierwszy absolutny pomiar pozycji zgłaszający
+    # prawdziwe (przesunięte) miejsce startu, następuje nagła korekcja pozycji, która
+    # objawia się jako skok pochodnej w regulatorze PID ("rozjeżdżanie się" robota).
+    # Zmieniając pozycję startową ROV-a w .scn, zaktualizuj też te trzy wartości.
+    initial_state: [0.0, 0.0, -1.0,  0.0, 0.0, 0.0,
+                     0.0, 0.0, 0.0,  0.0, 0.0, 0.0,
+                     0.0, 0.0, 0.0]
+
+    # 1. Odometria kinematyczna ze Stonefisha (po korekcie znaku Z w odometry_converter_node,
+    # patrz rov_localization/launch/localization_launch.py)
+    odom0: /marines_rov/odometry_enu
     odom0_config: [true,  true,  true,   # X, Y, Z
                    false, false, false,  # Roll, Pitch, Yaw (bierzemy z IMU)
                    true,  true,  true,   # dX, dY, dZ (Prędkości liniowe)
