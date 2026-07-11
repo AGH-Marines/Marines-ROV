@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-import math
 import numpy as np
 import rclpy
 from rclpy.node import Node
@@ -7,38 +5,30 @@ from geometry_msgs.msg import Wrench
 from std_msgs.msg import Float64MultiArray
 from std_srvs.srv import SetBool
 
-# Geometria 4 silników poziomych (indeksy 0-3)
-HORIZONTAL_THRUSTERS = [
-    (-0.149471, -0.189471, -0.7853981634),  # FrontRight
-    (-0.149471, 0.189471, 0.7853981634),    # FrontLeft
-    (0.149471, -0.189471, -2.3561944902),   # BackRight
-    (0.149471, 0.189471, 2.3561944902),     # BackLeft
-]
+from rov_actuation.robot_model import load_thrusters
 
-# Geometria 4 silników pionowych (indeksy 4-7) [x, y]
-VERTICAL_THRUSTERS = [
-    (0.26325, 0.20925),   # DiveFrontRight
-    (0.26325, -0.20925),  # DiveFrontLeft
-    (-0.26325, 0.20925),  # DiveBackRight
-    (-0.26325, -0.20925), # DiveBackLeft
-]
+VERTICAL_DIR_Z_THRESHOLD = 0.5
 
-def build_horizontal_allocation_pinv():
+
+def build_horizontal_allocation_pinv(thrusters):
+    """Builds matrix A (3xN, rows Fx, Fy, Mz) for the horizontal thrusters."""
     columns = []
-    for x, y, yaw in HORIZONTAL_THRUSTERS:
-        dir_x, dir_y = math.cos(yaw), math.sin(yaw)
+    for t in thrusters:
+        x, y = t.position[0], t.position[1]
+        dir_x, dir_y = t.thrust_dir[0], t.thrust_dir[1]
         mz = x * dir_y - y * dir_x
         columns.append([dir_x, dir_y, mz])
     a = np.array(columns).T
     return np.linalg.pinv(a)
 
-def build_vertical_allocation_pinv():
-    """Buduje macierz A (3x4, wiersze Fz, Tx, Ty) dla silników pionowych."""
+
+def build_vertical_allocation_pinv(thrusters):
+    """Builds matrix A (3xN, rows Fz, Tx, Ty) for the vertical thrusters."""
     columns = []
-    for x, y in VERTICAL_THRUSTERS:
-        # Zakładamy kierunek ciągu Z.
-        # Ramię siły do momentu: Torque_x = y * Fz, Torque_y = -x * Fz
-        columns.append([1.0, y, -x])
+    for t in thrusters:
+        x, y = t.position[0], t.position[1]
+        dir_z = t.thrust_dir[2]
+        columns.append([dir_z, y * dir_z, -x * dir_z])
     a = np.array(columns).T
     return np.linalg.pinv(a)
 
@@ -48,16 +38,32 @@ class ThrusterAllocatorNode(Node):
         super().__init__('thruster_allocator_node')
 
         self.armed = True
-        self.max_thrust_per_motor = 10.0  # Szacunkowy maksymalny ciąg jednego silnika (Newtony)
+        self.max_thrust_per_motor = 10.0 # Newtons
+        self.declare_parameter('robot_model_path', '')
+        model_path = self.get_parameter('robot_model_path').value or None
+        self.thrusters = load_thrusters(model_path)
 
-        self.horizontal_pinv = build_horizontal_allocation_pinv()
-        self.vertical_pinv = build_vertical_allocation_pinv()
+        self.horizontal_idx = [
+            i for i, t in enumerate(self.thrusters)
+            if abs(t.thrust_dir[2]) < VERTICAL_DIR_Z_THRESHOLD
+        ]
+        self.vertical_idx = [
+            i for i, t in enumerate(self.thrusters)
+            if abs(t.thrust_dir[2]) >= VERTICAL_DIR_Z_THRESHOLD
+        ]
+        self.horizontal_pinv = build_horizontal_allocation_pinv(
+            [self.thrusters[i] for i in self.horizontal_idx])
+        self.vertical_pinv = build_vertical_allocation_pinv(
+            [self.thrusters[i] for i in self.vertical_idx])
 
         self.wrench_sub = self.create_subscription(Wrench, '/marines_rov/cmd_wrench', self.wrench_callback, 10)
         self.thruster_pub = self.create_publisher(Float64MultiArray, '/thrusters/STONEFISH', 10)
         self.arm_srv = self.create_service(SetBool, '/rov_actuation/arm', self.arm_callback)
 
-        self.get_logger().info('Węzeł Alokacji Ciągu (Aktywna Stabilizacja) uruchomiony.')
+        self.get_logger().info(
+            f'Thrust Allocation Node (Active Stabilization) started with '
+            f'{len(self.thrusters)} thrusters ({len(self.horizontal_idx)} horizontal, '
+            f'{len(self.vertical_idx)} vertical), loaded from {model_path or "rov_simulation"}.')
 
     def arm_callback(self, request, response):
         self.armed = request.data
@@ -66,7 +72,7 @@ class ThrusterAllocatorNode(Node):
         return response
 
     def wrench_callback(self, msg):
-        thrusters = [0.0] * 8
+        thrusters = [0.0] * len(self.thrusters)
         cmd_msg = Float64MultiArray()
 
         if not self.armed:
@@ -74,25 +80,26 @@ class ThrusterAllocatorNode(Node):
             self.thruster_pub.publish(cmd_msg)
             return
 
-        # 1. Silniki poziome (X, Y, Yaw)
+        # 1. Horizontal thrusters (X, Y, Yaw)
         wrench_xy = np.array([msg.force.x, msg.force.y, msg.torque.z])
         horizontal_cmds = self.horizontal_pinv @ wrench_xy
-        for i in range(4):
-            # Normalizacja siły do sygnału [-1.0, 1.0]
-            thrusters[i] = float(horizontal_cmds[i]) / self.max_thrust_per_motor
+        for local_i, global_i in enumerate(self.horizontal_idx):
+            # Normalize the force to a [-1.0, 1.0] signal
+            thrusters[global_i] = float(horizontal_cmds[local_i]) / self.max_thrust_per_motor
 
-        # 2. Silniki pionowe (Z, Roll, Pitch)
+        # 2. Vertical thrusters (Z, Roll, Pitch)
         wrench_z_rp = np.array([msg.force.z, msg.torque.x, msg.torque.y])
         vertical_cmds = self.vertical_pinv @ wrench_z_rp
-        for i in range(4):
-            # Normalizacja siły do sygnału [-1.0, 1.0]
-            thrusters[i+4] = float(vertical_cmds[i]) / self.max_thrust_per_motor
+        for local_i, global_i in enumerate(self.vertical_idx):
+            # Normalize the force to a [-1.0, 1.0] signal
+            thrusters[global_i] = float(vertical_cmds[local_i]) / self.max_thrust_per_motor
 
-        # 3. Saturacja sygnału
+        # 3. Signal saturation
         thrusters = [max(min(t, 1.0), -1.0) for t in thrusters]
 
         cmd_msg.data = thrusters
         self.thruster_pub.publish(cmd_msg)
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -100,6 +107,7 @@ def main(args=None):
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()

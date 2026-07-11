@@ -8,7 +8,7 @@ from launch_ros.actions import Node
 def generate_launch_description():
     use_sim_arg = DeclareLaunchArgument(
         'use_sim', default_value='true',
-        description='true: publikuj na /thrusters/STONEFISH; false: remapuj na thrusters/PWM dla rov_bridge')
+        description='true: publish to /thrusters/STONEFISH; false: publish to thrusters/PWM for rov_bridge')
     use_sim = LaunchConfiguration('use_sim')
 
     allocator_sim = Node(
