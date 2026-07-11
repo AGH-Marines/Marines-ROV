@@ -19,10 +19,6 @@ def generate_launch_description():
         parameters=[ekf_config_path]
     )
 
-    # Konwertuje /marines_rov/odometry (natywna, "zejściowa" konwencja Stonefisha,
-    # Z rośnie w dół) na /marines_rov/odometry_enu (Z rośnie w górę, zgodnie z resztą
-    # stosu - patrz default_depth=-2.0 w pid_controller_node). Patrz komentarz w
-    # odometry_converter_node.py po szczegóły.
     odometry_converter = Node(
         package='rov_bridge',
         executable='odometry_converter',

@@ -1,29 +1,57 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch.conditions import IfCondition
 from launch_ros.actions import Node
 
 
+def _include(pkg, launch_file, **kwargs):
+    return IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(get_package_share_directory(pkg), 'launch', launch_file)),
+        **kwargs,
+    )
+
+
+def _setup_navigation(context, *args, **kwargs):
+    hybrid = LaunchConfiguration('nav_mode').perform(context) == 'hybrid'
+
+    control_launch = _include(
+        'rov_control', 'control_launch.py',
+        launch_arguments={
+            'path_topic': '/marines_rov/local_path' if hybrid else '/marines_rov/global_path',
+            'publish_path_complete': 'false' if hybrid else 'true',
+            'reset_pid_on_new_path': 'false' if hybrid else 'true',
+        }.items(),
+    )
+
+    nodes = [control_launch]
+    if hybrid:
+        nodes.append(Node(
+            package='rov_navigation',
+            executable='local_planner',
+            name='local_planner_node',
+            output='screen',
+        ))
+    return nodes
+
+
 def generate_launch_description():
     use_sim_arg = DeclareLaunchArgument('use_sim', default_value='true')
     use_sim = LaunchConfiguration('use_sim')
+    nav_mode_arg = DeclareLaunchArgument(
+        'nav_mode', default_value='hybrid',
+        description="'direct' = RRT* only (as before); 'hybrid' = RRT* + reactive APF layer")
 
-    def include(pkg, launch_file, **kwargs):
-        return IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(get_package_share_directory(pkg), 'launch', launch_file)),
-            **kwargs,
-        )
+    include = _include
 
     sim_launch = include('rov_simulation', 'sim_launch.py', condition=IfCondition(use_sim))
     localization_launch = include('rov_localization', 'localization_launch.py')
     mapping_launch = include('rov_mapping', 'mapping_launch.py')
     navigation_launch = include('rov_navigation', 'navigation_launch.py')
-    control_launch = include('rov_control', 'control_launch.py')
     actuation_launch = include('rov_actuation', 'actuation_launch.py', launch_arguments={'use_sim': use_sim}.items())
     mission_launch = include('rov_mission', 'mission_launch.py')
 
@@ -53,13 +81,6 @@ def generate_launch_description():
         arguments=['0', '0', '0', '0', '0', '0', 'base_link', 'ROV/imu_filter']
     )
 
-    # Stonefish nie publikuje TF dla żadnej z ramek sensorów (patrz komentarz w
-    # rov_mapping/mapping_launch.py) - kamera potrzebuje własnej statycznej
-    # transformacji, inaczej wyświetlacze RViz zależne od TF (np. Camera) będą
-    # w nieskończoność czekać na transformację i zapychać kolejkę Message Filter.
-    # Rotacja -90/0/-90 to konwersja "ramka fizyczna -> ramka optyczna" (Z=przód,
-    # X=prawo, Y=dół - konwencja obrazów/kamer w ROS), taka sama jak dla multibeamu
-    # w rov_mapping/mapping_launch.py.
     zed_camera_tf = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
@@ -73,8 +94,9 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        use_sim_arg,
+        use_sim_arg, nav_mode_arg,
         sim_launch, localization_launch, mapping_launch, navigation_launch,
-        control_launch, actuation_launch, mission_launch, dvl_converter, imu_filter,
-        zed_camera_tf, robot_state_publisher, rviz_node
+        actuation_launch, mission_launch, dvl_converter, imu_filter,
+        zed_camera_tf, robot_state_publisher, rviz_node,
+        OpaqueFunction(function=_setup_navigation),
     ])

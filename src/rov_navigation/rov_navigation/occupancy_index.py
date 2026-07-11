@@ -3,10 +3,6 @@ from scipy.spatial import cKDTree
 
 
 class OccupancyIndex:
-    """Utrzymuje odpytywalną strukturę zajętości zbudowaną z tablicy MarkerArray
-    /occupied_cells_vis_array publikowanej przez octomap_server (jeden marker
-    typu CUBE_LIST na głębokość drzewa ósemkowego)."""
-
     def __init__(self, robot_radius: float):
         self.robot_radius = robot_radius
         self._centers = np.empty((0, 3))
@@ -29,12 +25,20 @@ class OccupancyIndex:
         self._half_sizes = np.array(half_sizes)
         self._tree = cKDTree(self._centers)
 
+    def nearby(self, point, radius):
+        if self._tree is None:
+            return np.empty((0, 3))
+        idxs = self._tree.query_ball_point(point, r=radius)
+        if not idxs:
+            return np.empty((0, 3))
+        return self._centers[idxs]
+
     def is_occupied(self, point) -> bool:
         if self._tree is None:
-            return False  # brak mapy jeszcze: optymistycznie wolne, żeby nie blokować planowania
+            return False  # no map yet: optimistically free, so as not to block planning
         max_half = self._half_sizes.max() if len(self._half_sizes) else 0.0
         margin = max_half + self.robot_radius
-        idxs = self._tree.query_ball_point(point, r=margin * 1.7320508)  # sqrt(3), bezpieczny bound AABB
+        idxs = self._tree.query_ball_point(point, r=margin * 1.7320508)  # sqrt(3), safe AABB bound
         for i in idxs:
             c = self._centers[i]
             h = self._half_sizes[i] + self.robot_radius

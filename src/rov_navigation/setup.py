@@ -26,6 +26,7 @@ setup(
     entry_points={
         'console_scripts': [
             'planner = rov_navigation.planner_node:main',
+            'local_planner = rov_navigation.local_planner_node:main',
         ],
     },
 )

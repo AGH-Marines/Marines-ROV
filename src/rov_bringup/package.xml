@@ -3,7 +3,7 @@
 <package format="3">
   <name>rov_bringup</name>
   <version>0.0.0</version>
-  <description>Orkiestracja uruchamiania i konfiguracja RViz dla stosu ROV</description>
+  <description>Launch orchestration and RViz configuration for the ROV stack</description>
   <maintainer email="dev@todo.todo">dev</maintainer>
   <license>TODO: License declaration</license>
 

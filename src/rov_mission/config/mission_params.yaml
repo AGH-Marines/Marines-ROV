@@ -1,0 +1,10 @@
+/**:
+  ros__parameters:
+    map_frame: odom
+    base_frame: base_link
+    cruise_depth: -1.0
+    goal:
+      x: 14.0
+      y: 0.0
+      z: -1.5
+      yaw: 0.0

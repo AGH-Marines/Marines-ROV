@@ -52,12 +52,12 @@ RUN apt-get update \
     && rm -rf /ver/lib/apt/lists/*
 
 # Download ROS2 packages
-# ros-$ROS_DISTRO-diagnostic-updater jest wymieniony jawnie (a nie tylko dociągany
-# tranzytywnie przez robot-localization), bo w praktyce zdarzało się, że apt dobierał
-# do niego starszą wersję niż ta, z którą został zbudowany robot_localization, co
-# kończyło się błędem "libdiagnostic_updater.so: cannot open shared object file"
-# przy starcie ekf_node. Jawne żądanie najnowszej wersji w tej samej transakcji apt
-# ogranicza ryzyko takiego rozjazdu.
+# ros-$ROS_DISTRO-diagnostic-updater is listed explicitly (not just pulled in
+# transitively via robot-localization), because in practice apt would sometimes
+# pick an older version of it than the one robot_localization was built against,
+# which resulted in a "libdiagnostic_updater.so: cannot open shared object file"
+# error at ekf_node startup. Explicitly requesting the latest version in the same
+# apt transaction limits the risk of that mismatch.
 RUN apt-get update \
     && apt-get install -y \
     ros-$ROS_DISTRO-joint-state-publisher \

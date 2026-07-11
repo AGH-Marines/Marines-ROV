@@ -7,6 +7,37 @@ from rov_mission.behaviors import (
     CaptureHomePose, ArmThrusters, DiveToDepth, StartMapping, PublishGoal, MonitorMission,
 )
 
+STAGE_DESCRIPTIONS = {
+    'CaptureHomePose': 'Zapamiętywanie pozycji startowej (home)',
+    'ArmThrusters': 'Uzbrajanie pędników',
+    'DiveToTargetDepth': 'Nurkowanie na głębokość docelową',
+    'StartMapping': 'Oczekiwanie na dane z mapowania 3D (OctoMap)',
+    'PublishGoal': 'Publikowanie celu misji',
+    'MonitorGoalApproach': 'Dojazd do celu misji',
+    'PublishHomeGoal': 'Publikowanie celu powrotu do bazy',
+    'MonitorReturnHome': 'Powrót do pozycji startowej',
+}
+
+
+def make_stage_logger(node):
+    """Logs the currently active leaf behaviour whenever it changes, so the
+    console shows which mission stage is running without spamming every tick."""
+    last_stage = {'name': None}
+
+    def handler(tree):
+        active = next(
+            (b for b in tree.root.iterate()
+             if not getattr(b, 'children', None) and b.status == py_trees.common.Status.RUNNING),
+            None,
+        )
+        stage = active.name if active else None
+        if stage != last_stage['name']:
+            last_stage['name'] = stage
+            if stage is not None:
+                node.get_logger().info(f'Etap misji: {STAGE_DESCRIPTIONS.get(stage, stage)}')
+
+    return handler
+
 
 def create_root(node) -> py_trees.behaviour.Behaviour:
     goal_x = node.get_parameter('goal.x').value
@@ -19,13 +50,13 @@ def create_root(node) -> py_trees.behaviour.Behaviour:
     go_to_goal = py_trees.composites.Sequence(name="GoToGoal", memory=True)
     go_to_goal.add_children([
         PublishGoal(name="PublishGoal", static_goal=(goal_x, goal_y, goal_z, goal_yaw)),
-        MonitorMission(name="MonitorGoalApproach"),
+        MonitorMission(name="MonitorGoalApproach", static_goal=(goal_x, goal_y, goal_z, goal_yaw)),
     ])
 
     return_home = py_trees.composites.Sequence(name="ReturnHome", memory=True)
     return_home.add_children([
         PublishGoal(name="PublishHomeGoal", key="home_pose"),
-        MonitorMission(name="MonitorReturnHome"),
+        MonitorMission(name="MonitorReturnHome", key="home_pose"),
     ])
 
     root.add_children([
@@ -36,7 +67,11 @@ def create_root(node) -> py_trees.behaviour.Behaviour:
         go_to_goal,
         return_home,
     ])
-    return root
+    # Without this, a Sequence that has reached SUCCESS/FAILURE restarts itself on
+    # the very next tick_tock tick (memory only persists status while RUNNING) - the
+    # whole mission would loop forever instead of running once as PLAN.md describes.
+    return py_trees.decorators.OneShot(
+        name="MissionOnce", child=root, policy=py_trees.common.OneShotPolicy.ON_COMPLETION)
 
 
 def main(args=None):
@@ -55,13 +90,12 @@ def main(args=None):
     try:
         tree.setup(node=node, timeout=15.0)
     except Exception as exc:
-        node.get_logger().error(f'Inicjalizacja drzewa zachowań nie powiodła się: {exc}')
+        node.get_logger().error(f'Behavior tree initialization failed: {exc}')
         rclpy.shutdown()
         return
 
+    tree.add_post_tick_handler(make_stage_logger(node))
     tree.tick_tock(period_ms=200.0)
-    # tick_tock() tylko tworzy timer rclpy.Timer i wraca od razu — samo tikowanie
-    # drzewa odbywa się w callbackach timera podczas spin(), więc trzeba tu spinować.
     try:
         rclpy.spin(node)
     except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):

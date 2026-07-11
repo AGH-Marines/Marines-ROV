@@ -1,6 +1,36 @@
-Specyfikacja Projektu: Autonomiczny System Nawigacji i Mapowania 3D dla Robota Podwodnego (ROV)
-1. Cel ProjektuGłównym celem projektu jest stworzenie modularnego, niezawodnego i skalowalnego systemu sterowania oraz percepcji dla robota podwodnego (ROV) w środowisku ROS2 (Humble). Robot ma za zadanie wykonywać autonomiczne misje polegające na bezpiecznym przemieszczaniu się z punktu A do punktu B po najkrótszej (optymalnej) ścieżce, skutecznie omijając statyczne i dynamiczne przeszkody w przestrzeni trójwymiarowej.
-Kluczowe założenia funkcjonalne:Stabilizacja bazy (Station Keeping): Robot aktywnie kompensuje siły zewnętrzne (wypornościowe, prądy wodne) i utrzymuje zadaną głębokość ($Z$) oraz orientację ($Yaw$) za pomocą kaskadowych regulatorów PID.Percepcja i Mapowanie 3D: System przetwarza surowe dane z sonaru wielowiązkowego (Multibeam) lub kamer stereowizyjnych i buduje ciągłą mapę zajętości przestrzeni w postaci drzewa ósemkowego (OctoMap).Autonomiczne Planowanie Ścieżki: System wyznacza bezpieczną trajektorię w przestrzeni 3D (6 DoF) wolną od kolizji.Abstrakcja Sprzętowa (Portability): Architektura oddziela warstwę symulacji od logiki biznesowej robota. Przeniesienie systemu na fizycznego robota wymaga jedynie podmiany pakietu wejściowego (sterowników czujników) oraz wyjściowego (miksera silników).Architektura oparta na TF2: Cała lokalizacja i sterowanie bazują na zapytaniach do dynamicznego drzewa transformacji (tf2), eliminując sztywne powiązania z tematami odometrii.2. Tryby Pracy (Launchery nadrzędne)System sterowania udostępnia dwa główne tryby operacyjne uruchamiane z poziomu pakietu integracyjnego:Tryb 1: Sterowanie Padem (Manualno-Półautonomiczny)Launcher: teleop_joy.launch.pyOpis działania: Operator kontroluje ruch postępowy robota (osie $X, Y$) za pomocą gałek kontrolera (np. od Xbox/PlayStation). Osie pionowa ($Z$) oraz obrotowa ($Yaw$) są opcjonalnie kontrolowane przez automatyczny węzeł stabilizacji. Gdy operator puści gałki, robot automatycznie "blokuje" swoją pozycję w wodzie.Zastosowanie: Misje inspekcyjne, mapowanie wstępne zbiornika, procedury awaryjne.Tryb 2: Pełna Autonomia (Przejazd punkt A -> B)Launcher: autonomy.launch.pyOpis działania: Operator (lub zewnętrzna maszyna stanów) zadaje współrzędne celu ($X, Y, Z, Yaw$). Pakiet nawigacji analizuje aktualną strukturę OctoMapy, generuje optymalną trasę i przekazuje ją do regulatora trajektorii. Robot samodzielnie wykonuje pełen przejazd, na bieżąco korygując trasę w przypadku wykrycia nowych obiektów.3. Struktura Folderów Przestrzeni Roboczej (Workspace)Plaintextros2_ws/
+# Project Specification: Autonomous 3D Navigation and Mapping System for an Underwater Robot (ROV)
+
+## 1. Project Goal
+
+The main goal of the project is to build a modular, reliable, and scalable control and perception system for an underwater robot (ROV) in the ROS2 (Humble) environment. The robot's task is to carry out autonomous missions consisting of safely moving from point A to point B along the shortest (optimal) path, while effectively avoiding static and dynamic obstacles in three-dimensional space.
+
+**Key functional assumptions:**
+
+- **Station Keeping:** The robot actively compensates for external forces (buoyancy, water currents) and maintains a set depth ($Z$) and orientation ($Yaw$) using cascaded PID controllers.
+- **3D Perception and Mapping:** The system processes raw data from a multibeam sonar or stereo cameras and builds a continuous occupancy map of space in the form of an octree (OctoMap).
+- **Autonomous Path Planning:** The system determines a safe, collision-free trajectory in 3D space (6 DoF).
+- **Hardware Abstraction (Portability):** The architecture separates the simulation layer from the robot's business logic. Porting the system to a physical robot only requires swapping the input package (sensor drivers) and the output package (motor mixer).
+- **TF2-based Architecture:** All localization and control rely on queries to the dynamic transform tree (tf2), eliminating rigid dependencies on odometry topics.
+
+## 2. Operating Modes (Top-Level Launchers)
+
+The control system provides two main operating modes, launched from the integration package:
+
+**Mode 1: Gamepad Control (Manual/Semi-Autonomous)**
+
+- Launcher: `teleop_joy.launch.py`
+- Description: The operator controls the robot's translational motion (axes $X, Y$) using the controller sticks (e.g. Xbox/PlayStation). The vertical axis ($Z$) and yaw ($Yaw$) are optionally controlled by an automatic stabilization node. When the operator releases the sticks, the robot automatically "locks" its position in the water.
+- Use case: Inspection missions, preliminary tank mapping, emergency procedures.
+
+**Mode 2: Full Autonomy (Point A -> B Transit)**
+
+- Launcher: `autonomy.launch.py`
+- Description: The operator (or an external state machine) provides target coordinates ($X, Y, Z, Yaw$). The navigation package analyzes the current OctoMap structure, generates the optimal route, and passes it to the trajectory controller. The robot autonomously completes the entire transit, continuously correcting its route whenever new obstacles are detected.
+
+## 3. Workspace Folder Structure
+
+```
+ros2_ws/
 ├── Dockerfile
 ├── README.md
 └── src/
@@ -11,7 +41,7 @@ Kluczowe założenia funkcjonalne:Stabilizacja bazy (Station Keeping): Robot akt
     │   └── rviz/
     │       └── default_view.rviz
     ├── rov_simulation/
-    │   ├── data/              # Modele 3D (.obj, .dae) robota i przeszkód
+    │   ├── data/              # 3D models (.obj, .dae) of the robot and obstacles
     │   ├── launch/
     │   │   └── sim_launch.py
     │   └── scenarios/
@@ -48,7 +78,70 @@ Kluczowe założenia funkcjonalne:Stabilizacja bazy (Station Keeping): Robot akt
         └── rov_mission/
             ├── __init__.py
             └── state_machine_node.py
-4. Szczegółowy Opis Pakietów1. rov_simulation (Warstwa Środowiskowa)Typ: ament_cmake (Zarządzanie zasobami i plikami sceny dla Stonefish)Zadanie: Odpowiada za fizykę świata, hydrodynamikę robota, odwzorowanie grawitacji i wyporu. Generuje sztuczny szum dla sensorów.Wejścia: /thrusters/STONEFISH (std_msgs/Float64MultiArray - wektor ciągu silników)Wyjścia: Tematy surowe czujników: /marines_rov/odometry, /marines_rov/imu, /marines_rov/dvl, /marines_rov/point_cloud.2. rov_localization (Warstwa Estymacji Stanu)Typ: Integracja zewnętrznych narzędzi ROS2 (robot_localization)Zadanie: Wykonuje fuzję danych z IMU (orientacja, przyspieszenia), DVL (prędkość liniowa względem dna) oraz odometrii kinematycznej za pomocą Rozszerzonego Filtru Kalmana (EKF).Kluczowa funkcja: Odfiltrowuje szum i publikuje dynamiczną relację w drzewie transformacji: odom -> base_link.Wyjścia: /odometry/filtered (nav_msgs/Odometry), transformacja TF2.3. rov_mapping (Warstwa Percepcji 3D)Typ: Integracja zewnętrznych narzędzi ROS2 (octomap_server)Zadanie: Buduje trójwymiarową mapę środowiska. Pobiera chmurę punktów z wirtualnego sonaru, pobiera aktualną pozycję robota poprzez tf2 (relacja odom -> base_link) i rzutuje punkty do przestrzennej bazy danych wokseli.Wyjścia: /octomap_binary, /octomap_full (octomap_msgs), /occupied_cells_vis_array (Wizualizacja struktur 3D w RViz2).4. rov_navigation (Warstwa Planowania Trasy)Typ: ament_pythonZadanie: Implementuje algorytm poszukiwania najkrótszej bezpiecznej ścieżki (np. RRT* lub 3D A*). Reaguje na komendy przejścia do punktu docelowego. Śledzi zajętość przestrzeni na podstawie mapy OctoMapy.Wejścia: Mapy zajętości, /marines_rov/goal_pose (geometry_msgs/PoseStamped)Wyjścia: /marines_rov/global_path (nav_msgs/Path - lista punktów trasy).5. rov_control (Warstwa Sterowania i Śledzenia Trajektorii)Typ: ament_pythonZadanie: Odczytuje zadaną ścieżkę lub pozycję. Wykorzystuje tf2_ros.TransformListener, aby w czasie rzeczywistym sprawdzać pozycję base_link względem układu mapy/odom. Liczy uchyb i generuje wektor pożądanych sił za pomocą PID.Wejścia: Dynamiczne drzewo TF2, zadana ścieżka.Wyjścia: /marines_rov/cmd_wrench (geometry_msgs/Wrench - oczekiwane siły $F_x, F_y, F_z$ i moment $M_z$).6. rov_actuation (Warstwa Sprzętowa / Mixer)Typ: ament_pythonZadanie: Implementuje Macierz Alokacji Ciągu (TAM). Pobiera ogólne żądanie siły i rozbija je na poszczególne pędniki robota.Przenaszalność (Portability): W symulacji wyjście jest publikowane do Stonefisha. Na prawdziwym robocie ten pakiet wysyła pakiety bezpośrednio do sterowników silników (np. poprzez protokół I2C, PWM lub magistralę CAN).Wejścia: /marines_rov/cmd_wrenchWyjścia: /thrusters/STONEFISH (w symulacji) lub bezpośredni interfejs sprzętowy.7. rov_mission (Zarządzanie Misją / Logika Nadrzędna)Typ: ament_pythonZadanie: Mózg operacyjny robota (Maszyna Stanów / Drzewo Zachowań). Odpowiada za sekwencję zdarzeń: uzbrojenie silników -> zanurzenie -> start mapowania -> wysłanie celu -> monitorowanie stanu -> powrót.8. rov_bringup (Integracja i Orkiestracja)Typ: Meta-pakiet startowy.Zadanie: Nie zawiera kodu źródłowego, grupuje pliki launch i konfiguracje RViz2. Pozwala jedną komendą uruchomić cały ekosystem.5. Wymagane Pakiety i Modyfikacja Środowiska (Dockerfile)Projekt opiera się na zaawansowanych bibliotekach nawigacyjnych i percepcyjnych systemu ROS2. Aby konteneryzowane środowisko deweloperskie mogło poprawnie zbudować przestrzeń roboczą, niezbędna jest modyfikacja pliku Dockerfile w celu zainstalowania kluczowych zależności systemowych.Wymagane pakiety zewnętrzne ROS2:ros-humble-robot-localization (Rozszerzony Filtr Kalmana EKF 3D)ros-humble-octomap-server (Serwer mapowania i integracji drzew ósemkowych)ros-humble-octomap-msgs (Definicje wiadomości ROS2 dla struktur OctoMap)ros-humble-joy & ros-humble-teleop-twist-joy (Obsługa interfejsu i mapowania padów)Wymagana sekcja w pliku Dockerfile:Przed etapem kopiowania kodu źródłowego i wywołaniem colcon build, w pliku Dockerfile należy umieścić instrukcję instalacji pakietów APT:Dockerfile# Aktualizacja repozytoriów i instalacja zależności dla systemów percepcji, lokalizacji i kontroli
+```
+
+## 4. Detailed Package Description
+
+**1. rov_simulation (Environment Layer)**
+- Type: `ament_cmake` (manages assets and scene files for Stonefish)
+- Task: Handles world physics, robot hydrodynamics, and models gravity and buoyancy. Generates artificial noise for the sensors.
+- Inputs: `/thrusters/STONEFISH` (`std_msgs/Float64MultiArray` - thruster thrust vector)
+- Outputs: Raw sensor topics: `/marines_rov/odometry`, `/marines_rov/imu`, `/marines_rov/dvl`, `/marines_rov/point_cloud`.
+
+**2. rov_localization (State Estimation Layer)**
+- Type: Integration of external ROS2 tools (`robot_localization`)
+- Task: Fuses data from the IMU (orientation, accelerations), DVL (linear velocity relative to the seabed), and kinematic odometry using an Extended Kalman Filter (EKF).
+- Key function: Filters out noise and publishes the dynamic relation in the transform tree: `odom -> base_link`.
+- Outputs: `/odometry/filtered` (`nav_msgs/Odometry`), TF2 transform.
+
+**3. rov_mapping (3D Perception Layer)**
+- Type: Integration of external ROS2 tools (`octomap_server`)
+- Task: Builds a three-dimensional map of the environment. Consumes the point cloud from the virtual sonar, obtains the robot's current position via tf2 (`odom -> base_link` relation), and projects the points into a spatial voxel database.
+- Outputs: `/octomap_binary`, `/octomap_full` (`octomap_msgs`), `/occupied_cells_vis_array` (visualization of 3D structures in RViz2).
+
+**4. rov_navigation (Route Planning Layer)**
+- Type: `ament_python`
+- Task: Implements a shortest-safe-path search algorithm (e.g. RRT* or 3D A*). Reacts to commands to move to a target point. Tracks space occupancy based on the OctoMap.
+- Inputs: Occupancy map, `/marines_rov/goal_pose` (`geometry_msgs/PoseStamped`)
+- Outputs: `/marines_rov/global_path` (`nav_msgs/Path` - list of route waypoints).
+
+**5. rov_control (Control and Trajectory Tracking Layer)**
+- Type: `ament_python`
+- Task: Reads the target path or position. Uses `tf2_ros.TransformListener` to check the `base_link` position relative to the map/odom frame in real time. Computes the error and generates a desired force vector using PID.
+- Inputs: Dynamic TF2 tree, target path.
+- Outputs: `/marines_rov/cmd_wrench` (`geometry_msgs/Wrench` - desired forces $F_x, F_y, F_z$ and torque $M_z$).
+
+**6. rov_actuation (Hardware Layer / Mixer)**
+- Type: `ament_python`
+- Task: Implements the Thrust Allocation Matrix (TAM). Takes the overall force request and distributes it across the robot's individual thrusters.
+- Portability: In simulation, the output is published to Stonefish. On the real robot, this package sends packets directly to the motor controllers (e.g. via I2C, PWM, or CAN bus).
+- Inputs: `/marines_rov/cmd_wrench`
+- Outputs: `/thrusters/STONEFISH` (in simulation) or a direct hardware interface.
+
+**7. rov_mission (Mission Management / Top-Level Logic)**
+- Type: `ament_python`
+- Task: The robot's operational brain (state machine / behavior tree). Responsible for the event sequence: arm thrusters -> dive -> start mapping -> send goal -> monitor state -> return.
+
+**8. rov_bringup (Integration and Orchestration)**
+- Type: Top-level meta-package.
+- Task: Contains no source code; groups launch files and RViz2 configurations. Allows the whole ecosystem to be started with a single command.
+
+## 5. Required Packages and Environment Modifications (Dockerfile)
+
+The project relies on advanced ROS2 navigation and perception libraries. For the containerized development environment to build the workspace correctly, the Dockerfile must be modified to install key system dependencies.
+
+**Required external ROS2 packages:**
+- `ros-humble-robot-localization` (3D Extended Kalman Filter, EKF)
+- `ros-humble-octomap-server` (octree mapping and integration server)
+- `ros-humble-octomap-msgs` (ROS2 message definitions for OctoMap structures)
+- `ros-humble-joy` & `ros-humble-teleop-twist-joy` (gamepad interface and mapping support)
+
+**Required Dockerfile section:**
+
+Before the source code copy stage and the `colcon build` call, the Dockerfile must include the APT package installation instruction:
+
+```dockerfile
+# Update repositories and install dependencies for the perception, localization, and control systems
 RUN apt-get update && apt-get install -y \
     ros-humble-robot-localization \
     ros-humble-octomap-server \
@@ -56,28 +149,39 @@ RUN apt-get update && apt-get install -y \
     ros-humble-joy \
     ros-humble-teleop-twist-joy \
     && rm -rf /var/lib/apt/lists/*
-6. Strategia Przeniesienia na Platformę Sprzętową (Hardware Porting)Struktura została zaprojektowana tak, aby przejście z symulatora na fizycznego robota pracującego np. pod kontrolą komputera jednopłytkowego (Raspberry Pi 5 / NVIDIA Jetson) zamontowanego na pokładzie ROV, wymagało minimalnej ingerencji w kod:Plaintext    [ TRYB SYMULACJI ]                               [ TRYB FIZYCZNEGO ROBOTA ]
+```
+
+## 6. Hardware Porting Strategy
+
+The structure is designed so that moving from the simulator to a physical robot running, e.g., on a single-board computer (Raspberry Pi 5 / NVIDIA Jetson) mounted on the ROV requires minimal code changes:
+
+```
+    [ SIMULATION MODE ]                              [ PHYSICAL ROBOT MODE ]
   ┌───────────────────────┐                        ┌───────────────────────┐
-  │  pakiet:              │                        │  pakiet:              │
-  │  rov_simulation       │                        │  sterowniki_hardware  │
+  │  package:              │                        │  package:              │
+  │  rov_simulation       │                        │  hardware_drivers     │
   └──────────┬────────────┘                        └──────────┬────────────┘
-             │ (Surowe czujniki)                              │ (Prawdziwe czujniki)
+             │ (Raw sensors)                                  │ (Real sensors)
              v                                                v
 ┌──────────────────────────────────────────────────────────────────────────────────┐
-│                             Wspólny Rdzeń Systemu                                │
+│                                Shared System Core                                │
 │  [rov_localization (EKF)] -> [rov_mapping (OctoMap)] -> [rov_navigation (RRT*)]  │
 │                                       │                                          │
 │                                       v                                          │
-│                            [rov_control (PID z TF2)]                             │
+│                            [rov_control (PID with TF2)]                          │
 └───────────────────────────────────────┬──────────────────────────────────────────┘
-                                        │ (Żądany Wrench)
+                                        │ (Requested Wrench)
                                         v
                           ┌───────────────────────────┐
-                          │ pakiet: rov_actuation     │
+                          │ package: rov_actuation    │
                           └─────────────┬─────────────┘
                                         │
                  ┌──────────────────────┴──────────────────────┐
-                 ▼ (Wybór środowiska uruchomieniowego)         ▼
-      [ Symulator Stonefish ]                         [ Fizyczne pędniki ]
-      (Float64MultiArray do .scn)                     (Interfejs PWM / I2C / CAN)
-Odcięcie symulacji: W nadrzędnym pliku launch pakietu rov_bringup zmieniamy flagę use_sim na false. Powoduje to nieuruchamianie pakietu rov_simulation.Podpięcie fizycznych czujników: Wstawiamy w to miejsce węzły producenta fizycznego sprzętu (np. pakiet micro-ROS dla IMU, sterowniki DVL po porcie szeregowym, oraz sterownik zed-ros2-wrapper dla fizycznej kamery). Ważne jest jedynie zremapowanie tematów wyjściowych tak, aby trafiały do rov_localization i rov_mapping.Adaptacja alokatora pędników: W pakiecie rov_actuation podmieniamy klasę publikującą. Zamiast wysyłać wektor ciągu na temat /thrusters/STONEFISH, importujemy bibliotekę obsługi szyny sprzętowej (np. smbus/PCA9685 dla Pythona) i wysyłamy sygnały bezpośrednio na piny sterowników pędników. Cała warstwa lokalizacji, mapowania 3D oraz planowania ścieżki pozostaje nienaruszona.
+                 ▼ (Choice of runtime environment)              ▼
+      [ Stonefish Simulator ]                         [ Physical thrusters ]
+      (Float64MultiArray to .scn)                     (PWM / I2C / CAN interface)
+```
+
+- **Disconnecting the simulation:** In the top-level launch file of the `rov_bringup` package, set the `use_sim` flag to `false`. This prevents the `rov_simulation` package from being launched.
+- **Connecting physical sensors:** Insert the hardware vendor's nodes in its place (e.g. a micro-ROS package for the IMU, serial-port DVL drivers, and the `zed-ros2-wrapper` driver for the physical camera). The only requirement is remapping the output topics so they reach `rov_localization` and `rov_mapping`.
+- **Adapting the thruster allocator:** In the `rov_actuation` package, replace the publishing class. Instead of sending the thrust vector to the `/thrusters/STONEFISH` topic, import a hardware bus library (e.g. `smbus`/`PCA9685` for Python) and send signals directly to the thruster controller pins. The entire localization, 3D mapping, and path planning layer remains untouched.

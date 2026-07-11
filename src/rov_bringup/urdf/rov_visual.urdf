@@ -1,12 +1,12 @@
 <?xml version="1.0"?>
 <robot name="rov_visual">
   <!--
-    Wyłącznie wizualny szkielet ROV-a do RViz (nie ma żadnej fizyki/kolizji).
-    Wszystko wisi na "base_link", żeby nie tworzyć dodatkowych ramek TF
-    kolidujących z tymi już publikowanymi przez Stonefish/static_transform_publisher.
+    Purely a visual skeleton of the ROV for RViz (no physics/collision at all).
+    Everything hangs off "base_link" so as not to create extra TF frames that
+    would collide with the ones already published by Stonefish/static_transform_publisher.
   -->
   <link name="base_link">
-    <!-- Przybliżony kadłub (bounding box na podstawie rozstawu silników w underwater_world.scn) -->
+    <!-- Approximate hull (bounding box based on the thruster layout in underwater_world.scn) -->
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
@@ -17,7 +17,7 @@
       </material>
     </visual>
 
-    <!-- Kamera / multibeam (wspólne miejsce montażu, xyz="0.35 0 0" jak w underwater_world.scn) -->
+    <!-- Camera / multibeam (shared mounting point, xyz="0.35 0 0" as in underwater_world.scn) -->
     <visual>
       <origin xyz="0.35 0 0" rpy="0 0 0"/>
       <geometry>
@@ -28,7 +28,7 @@
       </material>
     </visual>
 
-    <!-- Strzałka kierunku patrzenia kamery (+X od kamery) -->
+    <!-- Arrow showing the camera's viewing direction (+X from the camera) -->
     <visual>
       <origin xyz="0.5 0 0" rpy="0 1.5707963 0"/>
       <geometry>

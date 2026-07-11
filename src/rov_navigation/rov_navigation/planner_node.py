@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 import math
+import numpy as np
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Path
-from std_msgs.msg import Bool
 from visualization_msgs.msg import MarkerArray
 from tf2_ros import Buffer, TransformListener, TransformException
 from tf_transformations import quaternion_from_euler
@@ -24,12 +24,13 @@ class PlannerNode(Node):
         self.declare_parameter('step_size', 0.5)
         self.declare_parameter('goal_bias', 0.1)
         self.declare_parameter('max_iterations', 3000)
-        # wnętrze basenu, ściany .scn @ +-5, dno @ z=4 w konwencji Stonefisha (Z w dół).
-        # Rama "odom" ma Z odwrócone (odometry_converter_node, powierzchnia ~= 0, głębiej
-        # = bardziej ujemne), więc dno (najgłębiej) to bounds_min, powierzchnia to bounds_max.
-        self.declare_parameter('bounds_min', [-4.5, -4.5, -3.8])
-        self.declare_parameter('bounds_max', [4.5, 4.5, -0.2])
-        self.declare_parameter('replan_period', 2.0)
+
+        self.declare_parameter('refine_iterations', 250)
+
+        self.declare_parameter('bounds_min', [-0.5, -4.7, -3.8])
+        self.declare_parameter('bounds_max', [25.5, 4.7, -0.2])
+
+        self.declare_parameter('replan_period', 0.5)
 
         self.map_frame = self.get_parameter('map_frame').value
         self.base_frame = self.get_parameter('base_frame').value
@@ -40,16 +41,14 @@ class PlannerNode(Node):
         self.occupancy = OccupancyIndex(robot_radius=self.get_parameter('robot_radius').value)
         self.create_subscription(MarkerArray, '/occupied_cells_vis_array', self.occupancy_callback, 10)
         self.create_subscription(PoseStamped, '/marines_rov/goal_pose', self.goal_callback, 10)
-        self.create_subscription(Bool, '/marines_rov/path_complete', self.path_complete_callback, 10)
         self.path_pub = self.create_publisher(Path, '/marines_rov/global_path', 10)
 
         self.current_goal = None
-        self.goal_reached = False
         self.current_waypoints = None
         self.replan_timer = self.create_timer(
             self.get_parameter('replan_period').value, self.replan_check)
 
-        self.get_logger().info('Węzeł Planowania Ścieżki (RRT*) uruchomiony.')
+        self.get_logger().info('Path Planning Node (RRT*) started.')
 
     def occupancy_callback(self, msg: MarkerArray):
         self.occupancy.update(msg)
@@ -58,7 +57,7 @@ class PlannerNode(Node):
         try:
             tf = self.tf_buffer.lookup_transform(self.map_frame, self.base_frame, rclpy.time.Time())
         except TransformException as ex:
-            self.get_logger().warn(f'TF niedostępny do planowania: {ex}', throttle_duration_sec=2.0)
+            self.get_logger().warn(f'TF unavailable for planning: {ex}', throttle_duration_sec=2.0)
             return None
         t = tf.transform.translation
         return (t.x, t.y, t.z)
@@ -75,30 +74,64 @@ class PlannerNode(Node):
 
     def goal_callback(self, msg: PoseStamped):
         self.current_goal = msg
-        self.goal_reached = False
+        # New goal = plan from scratch (don't seed with the route to the previous goal).
+        self.current_waypoints = None
         self._plan_and_publish(msg)
 
-    def path_complete_callback(self, msg: Bool):
-        # Gdy dotrze do celu, przestajemy replanować do tego samego punktu -
-        # inaczej pid_controller_node co replan_period dostaje nową (trywialną)
-        # trasę i cyklicznie wchodzi/wychodzi z trybu podążania po ścieżce.
-        if msg.data:
-            self.goal_reached = True
+    def _goal_reached(self, position):
+        goal = self.current_goal.pose.position
+        dist = math.dist(position, (goal.x, goal.y, goal.z))
+        return dist < self.get_parameter('goal_tolerance').value
+
+    def _segment_occupied(self, a, b, res=0.15):
+        """Samples the straight segment a->b at `res` meter spacing against the
+        current occupancy map. Shared by _path_still_clear (checks the stored
+        route) and replan_check (checks the robot's direct line to where it's
+        currently heading)."""
+        a = np.asarray(a, dtype=float)
+        b = np.asarray(b, dtype=float)
+        dist = float(np.linalg.norm(b - a))
+        steps = max(1, int(dist / res))
+        for i in range(steps + 1):
+            p = a + (b - a) * (i / steps)
+            if self.occupancy.is_occupied(p):
+                return True
+        return False
+
+    def _path_still_clear(self, waypoints):
+        pts = [np.asarray(w, dtype=float) for w in waypoints]
+        for a, b in zip(pts[:-1], pts[1:]):
+            if self._segment_occupied(a, b):
+                return False
+        return True
+
+    def _next_waypoint(self, position, waypoints):
+        pos = np.asarray(position, dtype=float)
+        best_d = float('inf')
+        best_point = np.asarray(waypoints[-1], dtype=float)
+        for i in range(len(waypoints) - 1):
+            a, b = np.asarray(waypoints[i], dtype=float), np.asarray(waypoints[i + 1], dtype=float)
+            ab = b - a
+            denom = float(np.dot(ab, ab))
+            t = 0.0 if denom < 1e-9 else float(np.clip(np.dot(pos - a, ab) / denom, 0.0, 1.0))
+            d = float(np.linalg.norm(pos - (a + t * ab)))
+            if d < best_d:
+                best_d, best_point = d, b
+        return best_point
 
     def replan_check(self):
-        """Wymóg Trybu 2: 'na bieżąco korygując trasę w przypadku wykrycia
-        nowych obiektów' — replanuje TYLKO gdy aktualna trasa faktycznie
-        przestała być bezpieczna. Bezwarunkowe przeliczanie co replan_period
-        (nawet gdy trasa wciąż jest poprawna) powodowało, że robot dostawał
-        świeżo policzoną trasę zaczynającą się w pozycji sprzed chwili (RRT*
-        planuje z opóźnieniem), czyli punkt startowy nowej trasy był już "za
-        robotem" - stąd cykliczne zawracanie."""
-        if self.current_goal is None or self.goal_reached:
+        if self.current_goal is None:
             return
-        if self.current_waypoints and all(
-            not self.occupancy.is_occupied(wp) for wp in self.current_waypoints
-        ):
+        position = self.get_current_position()
+        if position is None:
             return
+        if self._goal_reached(position):
+            return
+        if self.current_waypoints:
+            if self._path_still_clear(self.current_waypoints):
+                target = self._next_waypoint(position, self.current_waypoints)
+                if not self._segment_occupied(position, target):
+                    return
         self._plan_and_publish(self.current_goal)
 
     def _plan_and_publish(self, goal_msg: PoseStamped):
@@ -108,19 +141,19 @@ class PlannerNode(Node):
         goal = (goal_msg.pose.position.x, goal_msg.pose.position.y, goal_msg.pose.position.z)
 
         planner = self.make_planner()
-        waypoints = planner.plan(start, goal, goal_tolerance=self.get_parameter('goal_tolerance').value)
+        waypoints = planner.plan(
+            start, goal,
+            goal_tolerance=self.get_parameter('goal_tolerance').value,
+            seed_path=self.current_waypoints,
+            refine_iterations=self.get_parameter('refine_iterations').value,
+        )
 
         if waypoints is None:
-            self.get_logger().warn('RRT*: brak trasy do celu (przekroczono max_iterations lub cel w kolizji).')
+            self.get_logger().warn('RRT*: no route to goal (max_iterations exceeded or goal in collision).')
             return
 
         self.current_waypoints = waypoints
-
-        # waypoints[0] to pozycja startowa użyta do planowania (czyli w praktyce
-        # "tam gdzie robot już jest", z niewielkim opóźnieniem - planowanie chwilę
-        # trwa) - to nie jest sensowny cel do dopłynięcia, tylko punkt odniesienia.
-        # Pomijamy go, żeby kontroler od razu celował w pierwszy realny punkt trasy.
-        published_waypoints = waypoints[1:] if len(waypoints) > 1 else waypoints
+        published_waypoints = waypoints
 
         path_msg = Path()
         path_msg.header.frame_id = self.map_frame
@@ -141,7 +174,7 @@ class PlannerNode(Node):
             path_msg.poses.append(pose)
 
         self.path_pub.publish(path_msg)
-        self.get_logger().info(f'Opublikowano trasę: {len(published_waypoints)} punktów.')
+        self.get_logger().info(f'Published route: {len(published_waypoints)} points.')
 
 
 def main(args=None):

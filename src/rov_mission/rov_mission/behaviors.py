@@ -1,8 +1,9 @@
+import math
+
 import py_trees
 import py_trees.common
 from geometry_msgs.msg import PoseStamped
-from nav_msgs.msg import Path
-from std_msgs.msg import Bool
+from rclpy.time import Time
 from std_srvs.srv import SetBool
 from octomap_msgs.msg import Octomap
 from tf2_ros import Buffer, TransformListener, TransformException
@@ -11,7 +12,12 @@ from tf_transformations import euler_from_quaternion, quaternion_from_euler
 
 def _lookup_pose(node, tf_buffer, map_frame, base_frame):
     try:
-        tf = tf_buffer.lookup_transform(map_frame, base_frame, node.get_clock().now())
+        # Time() (zero stamp) asks for the latest available transform. Passing
+        # node.get_clock().now() instead fails on every call with an
+        # extrapolation-into-the-future error, since the TF buffer is always
+        # slightly behind wall-clock time - which silently stalls this lookup
+        # forever (the exception is swallowed below).
+        tf = tf_buffer.lookup_transform(map_frame, base_frame, Time())
     except TransformException:
         return None
     t = tf.transform.translation
@@ -67,6 +73,13 @@ class ArmThrusters(py_trees.behaviour.Behaviour):
 
 
 class DiveToDepth(py_trees.behaviour.Behaviour):
+    """Publishes its dive target through /marines_rov/goal_pose (like PublishGoal),
+    NOT directly onto /marines_rov/global_path: that topic is owned by planner_node
+    (RRT*) and consumed by local_planner_node to decide whether "the goal" has been
+    reached. A second writer publishing a trivial 1-point "stay here" path there
+    raced with the real route to the mission goal and got misread as an instant,
+    false goal-reached signal (see MonitorMission)."""
+
     def __init__(self, name="DiveToTargetDepth", target_z=-1.5, tolerance=0.15):
         super().__init__(name)
         self.target_z = target_z
@@ -78,7 +91,7 @@ class DiveToDepth(py_trees.behaviour.Behaviour):
         self.base_frame = self.node.get_parameter('base_frame').value
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self.node)
-        self.path_pub = self.node.create_publisher(Path, '/marines_rov/global_path', 10)
+        self.goal_pub = self.node.create_publisher(PoseStamped, '/marines_rov/goal_pose', 10)
         self._sent = False
 
     def initialise(self):
@@ -90,17 +103,14 @@ class DiveToDepth(py_trees.behaviour.Behaviour):
             return py_trees.common.Status.RUNNING
         cx, cy, cz, cyaw = pose
         if not self._sent:
-            msg = Path()
+            msg = PoseStamped()
             msg.header.frame_id = self.map_frame
             msg.header.stamp = self.node.get_clock().now().to_msg()
-            wp = PoseStamped()
-            wp.header = msg.header
-            wp.pose.position.x, wp.pose.position.y, wp.pose.position.z = cx, cy, self.target_z
+            msg.pose.position.x, msg.pose.position.y, msg.pose.position.z = cx, cy, self.target_z
             qx, qy, qz, qw = quaternion_from_euler(0.0, 0.0, cyaw)
-            wp.pose.orientation.x, wp.pose.orientation.y = qx, qy
-            wp.pose.orientation.z, wp.pose.orientation.w = qz, qw
-            msg.poses.append(wp)
-            self.path_pub.publish(msg)
+            msg.pose.orientation.x, msg.pose.orientation.y = qx, qy
+            msg.pose.orientation.z, msg.pose.orientation.w = qz, qw
+            self.goal_pub.publish(msg)
             self._sent = True
         if abs(cz - self.target_z) < self.tolerance:
             return py_trees.common.Status.SUCCESS
@@ -108,8 +118,8 @@ class DiveToDepth(py_trees.behaviour.Behaviour):
 
 
 class StartMapping(py_trees.behaviour.Behaviour):
-    """Nie uruchamia dynamicznie octomap_server (już działa ciągle w autonomy.launch.py);
-    bramkuje misję na tym, że pipeline mapowania żyje."""
+    """Does not dynamically launch octomap_server (it already runs continuously in
+    autonomy.launch.py); gates the mission on the mapping pipeline being alive."""
 
     def __init__(self, name="StartMapping"):
         super().__init__(name)
@@ -128,8 +138,8 @@ class StartMapping(py_trees.behaviour.Behaviour):
 
 class PublishGoal(py_trees.behaviour.Behaviour):
     def __init__(self, name, key=None, static_goal=None):
-        """key: klucz blackboard do odczytania krotki (x,y,z,yaw) (np. 'home_pose').
-        static_goal: krotka (x,y,z,yaw) użyta gdy key jest None (parametry misji)."""
+        """key: blackboard key to read the (x,y,z,yaw) tuple from (e.g. 'home_pose').
+        static_goal: (x,y,z,yaw) tuple used when key is None (mission parameters)."""
         super().__init__(name)
         self.key = key
         self.static_goal = static_goal
@@ -166,26 +176,42 @@ class PublishGoal(py_trees.behaviour.Behaviour):
 
 
 class MonitorMission(py_trees.behaviour.Behaviour):
-    def __init__(self, name="MonitorPathExecution", timeout_sec=120.0):
+    """Confirms arrival by checking the robot's own tf position against the target,
+    rather than trusting /marines_rov/path_complete: that flag is shared with
+    planner_node/local_planner_node's internal bookkeeping and can flip True for a
+    stale or unrelated path (see DiveToDepth), which previously made the mission
+    report success within one tick of publishing a new goal."""
+
+    def __init__(self, name="MonitorPathExecution", key=None, static_goal=None,
+                 timeout_sec=120.0, tolerance=0.3):
         super().__init__(name)
+        self.key = key
+        self.static_goal = static_goal
         self.timeout_sec = timeout_sec
-        self._complete = False
+        self.tolerance = tolerance
         self._start_time = None
+        if key is not None:
+            self.blackboard = self.attach_blackboard_client(name=self.name)
+            self.blackboard.register_key(key=key, access=py_trees.common.Access.READ)
 
     def setup(self, **kwargs):
         self.node = kwargs['node']
-        self.node.create_subscription(Bool, '/marines_rov/path_complete', self._cb, 10)
+        self.map_frame = self.node.get_parameter('map_frame').value
+        self.base_frame = self.node.get_parameter('base_frame').value
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self.node)
 
     def initialise(self):
-        self._complete = False
         self._start_time = self.node.get_clock().now()
 
-    def _cb(self, msg: Bool):
-        self._complete = msg.data
-
     def update(self):
-        if self._complete:
-            return py_trees.common.Status.SUCCESS
+        goal = getattr(self.blackboard, self.key) if self.key else self.static_goal
+        pose = _lookup_pose(self.node, self.tf_buffer, self.map_frame, self.base_frame)
+        if goal is not None and pose is not None:
+            gx, gy, gz, _ = goal
+            cx, cy, cz, _ = pose
+            if math.dist((cx, cy, cz), (gx, gy, gz)) < self.tolerance:
+                return py_trees.common.Status.SUCCESS
         elapsed = (self.node.get_clock().now() - self._start_time).nanoseconds / 1e9
         if elapsed > self.timeout_sec:
             return py_trees.common.Status.FAILURE

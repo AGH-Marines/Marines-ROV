@@ -3,7 +3,7 @@
 <package format="3">
   <name>rov_mission</name>
   <version>0.0.0</version>
-  <description>Mózg misji: drzewo zachowań py_trees_ros orkiestrujące sekwencję misji ROV</description>
+  <description>Mission brain: py_trees_ros behavior tree orchestrating the ROV mission sequence</description>
   <maintainer email="dev@todo.todo">dev</maintainer>
   <license>TODO: License declaration</license>
 

@@ -2,47 +2,48 @@ ekf_filter_node:
   ros__parameters:
     frequency: 30.0
     sensor_timeout: 0.1
-    two_d_mode: false # Robot porusza się w pełnym 3D (Z, Pitch, Roll są aktywne)
-    publish_tf: true  # Węzeł będzie automatycznie publikował transformację odom -> base_link
+    two_d_mode: false # The robot moves in full 3D (Z, Pitch, Roll are active)
+    publish_tf: true  # The node will automatically publish the odom -> base_link transform
 
     map_frame: map
     odom_frame: odom
     base_link_frame: base_link
     world_frame: odom
 
-    # Musi odpowiadać <world_transform> robota "ROV" w underwater_world.scn (X, Y bez
-    # zmian, Z ze znakiem minus - patrz odometry_converter_node.py). Bez tego EKF zakłada
-    # start w (0,0,0), a gdy przyjdzie pierwszy absolutny pomiar pozycji zgłaszający
-    # prawdziwe (przesunięte) miejsce startu, następuje nagła korekcja pozycji, która
-    # objawia się jako skok pochodnej w regulatorze PID ("rozjeżdżanie się" robota).
-    # Zmieniając pozycję startową ROV-a w .scn, zaktualizuj też te trzy wartości.
+    # Must match the "ROV" robot's <world_transform> in underwater_world.scn (X, Y
+    # unchanged, Z with a minus sign - see odometry_converter_node.py). Without this,
+    # the EKF assumes a start at (0,0,0), and when the first absolute position
+    # measurement reports the real (offset) start location, a sudden position
+    # correction occurs, which shows up as a derivative spike in the PID controller
+    # (the robot "lurching"). When changing the ROV's start position in the .scn,
+    # update these three values too.
     initial_state: [0.0, 0.0, -1.0,  0.0, 0.0, 0.0,
                      0.0, 0.0, 0.0,  0.0, 0.0, 0.0,
                      0.0, 0.0, 0.0]
 
-    # 1. Odometria kinematyczna ze Stonefisha (po korekcie znaku Z w odometry_converter_node,
-    # patrz rov_localization/launch/localization_launch.py)
+    # 1. Kinematic odometry from Stonefish (after the Z-sign correction in
+    # odometry_converter_node, see rov_localization/launch/localization_launch.py)
     odom0: /marines_rov/odometry_enu
     odom0_config: [true,  true,  true,   # X, Y, Z
-                   false, false, false,  # Roll, Pitch, Yaw (bierzemy z IMU)
-                   true,  true,  true,   # dX, dY, dZ (Prędkości liniowe)
+                   false, false, false,  # Roll, Pitch, Yaw (taken from the IMU)
+                   true,  true,  true,   # dX, dY, dZ (linear velocities)
                    false, false, false,  # dRoll, dPitch, dYaw
-                   false, false, false]  # Akceleracje
+                   false, false, false]  # Accelerations
 
-    # 2. Filtr IMU
+    # 2. IMU filter
     imu0: /marines_rov/imu
     imu0_config: [false, false, false,  # X, Y, Z
                   true,  true,  true,   # Roll, Pitch, Yaw
                   false, false, false,  # dX, dY, dZ
-                  true,  true,  true,   # dRoll, dPitch, dYaw (Prędkości kątowe)
-                  false,  false,  false]   # Akceleracje liniowe
+                  true,  true,  true,   # dRoll, dPitch, dYaw (angular velocities)
+                  false,  false,  false]   # Linear accelerations
 
     imu0_remove_gravitational_acceleration: true
 
-    # 3. Doppler Velocity Log (DVL) - prędkości liniowe względem dna
+    # 3. Doppler Velocity Log (DVL) - linear velocities relative to the seabed
     twist0: /marines_rov/dvl
     twist0_config: [false, false, false,
                     false, false, false,
-                    true,  true,  true,   # dX, dY, dZ z czujnika akustycznego
+                    true,  true,  true,   # dX, dY, dZ from the acoustic sensor
                     false, false, false,
                     false, false, false]

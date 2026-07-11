@@ -14,7 +14,6 @@ services:
     user: dev
     working_dir: /home/dev/ros2_ws
 
-    # Utrzymanie kontenera przy życiu dla PyCharma
     command: sleep infinity
 
     privileged: true
@@ -31,23 +30,23 @@ services:
       - 'c *:* rmw'
 
     volumes:
-      # Mapowanie przestrzeni roboczej
+      # Mount the workspace
       - .:/home/dev/ros2_ws:rw
-      # Mapowanie urządzeń (dla ROS2/ROV)
+      # Mount devices (for ROS2/ROV)
       - /dev:/dev:rw
-      # Konfiguracja GUI (X11)
+      # GUI configuration (X11)
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      # - ~/.Xauthority:/home/dev/.Xauthority:rw # Odkomentuj w razie problemów z uprawnieniami GUI
+      # - ~/.Xauthority:/home/dev/.Xauthority:rw # Uncomment if you run into GUI permission issues
 
     environment:
       - DISPLAY=${DISPLAY}
       - XAUTHORITY=/home/dev/.Xauthority
-      - PYTHONPATH=src:install/lib/python3.10/site-packages
-      # Zmienne środowiskowe dla NVIDIA
+      - PYTHONPATH=src:install/lib/python3.10/site-packages:/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages
+      # NVIDIA environment variables
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
 
-    # Sekcja przekazywania GPU (zastępuje --gpus all z runArgs)
+    # GPU passthrough section (replaces --gpus all from runArgs)
     deploy:
       resources:
         reservations:

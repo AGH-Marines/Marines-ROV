@@ -5,7 +5,7 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    # Ścieżki do plików pakietu
+    # Paths to the package files
     scenario_file = os.path.join(
         get_package_share_directory('rov_simulation'),
         'scenarios',
@@ -17,7 +17,7 @@ def generate_launch_description():
         'data'
     )
 
-    # Węzeł symulatora Stonefish
+    # Stonefish simulator node
     stonefish_node = Node(
         package='stonefish_ros2',
         executable='stonefish_simulator',

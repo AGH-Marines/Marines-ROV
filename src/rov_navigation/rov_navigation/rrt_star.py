@@ -18,7 +18,7 @@ class RRTStarPlanner:
                  collision_check_resolution=0.1):
         self.bounds_min = np.array(bounds_min, dtype=float)
         self.bounds_max = np.array(bounds_max, dtype=float)
-        self.collision_fn = collision_fn  # Callable[[np.ndarray]] -> bool (True == zajęte)
+        self.collision_fn = collision_fn  # Callable[[np.ndarray]] -> bool (True == occupied)
         self.step_size = step_size
         self.goal_bias = goal_bias
         self.search_radius_coeff = search_radius_coeff
@@ -54,15 +54,36 @@ class RRTStarPlanner:
         r = max(r, self.step_size)
         return [node for node in tree if np.linalg.norm(node.point - point) <= r]
 
-    def plan(self, start, goal, goal_tolerance=0.3):
+    def _seed_tree(self, tree, seed_path, goal, goal_tolerance):
+        best_goal_node = None
+        prev = tree[0]  # start node = the robot's current position
+        for wp in seed_path:
+            wp = np.asarray(wp, dtype=float)
+            if np.linalg.norm(wp - prev.point) < 1e-6:
+                continue
+            if not self._collision_free(prev.point, wp):
+                break
+            node = RRTNode(wp, parent=prev, cost=prev.cost + np.linalg.norm(wp - prev.point))
+            tree.append(node)
+            prev = node
+            if np.linalg.norm(wp - goal) < goal_tolerance:
+                if best_goal_node is None or node.cost < best_goal_node.cost:
+                    best_goal_node = node
+        return best_goal_node
+
+    def plan(self, start, goal, goal_tolerance=0.3, seed_path=None, refine_iterations=250):
         start = np.asarray(start, dtype=float)
         goal = np.asarray(goal, dtype=float)
         if self.collision_fn(start) or self.collision_fn(goal):
-            return None  # start/cel wewnątrz przeszkody
+            return None  # start/goal inside an obstacle
 
         tree = [RRTNode(start, parent=None, cost=0.0)]
         best_goal_node = None
 
+        if seed_path:
+            best_goal_node = self._seed_tree(tree, seed_path, goal, goal_tolerance)
+
+        iters_since_solution = 0
         for _ in range(self.max_iterations):
             rnd = self._sample(goal)
             nearest = self._nearest(tree, rnd)
@@ -92,6 +113,11 @@ class RRTStarPlanner:
                 if best_goal_node is None or new_node.cost < best_goal_node.cost:
                     best_goal_node = new_node
 
+            if best_goal_node is not None:
+                iters_since_solution += 1
+                if iters_since_solution >= refine_iterations:
+                    break
+
         if best_goal_node is None:
             return None
 
@@ -105,8 +131,6 @@ class RRTStarPlanner:
         return self._simplify(path)
 
     def _simplify(self, path):
-        """Wygładzanie skrótami: zachłannie łączy najwcześniejszy waypoint
-        z najdalszym, do którego odcinek jest wolny od kolizji."""
         if len(path) <= 2:
             return path
         simplified = [path[0]]

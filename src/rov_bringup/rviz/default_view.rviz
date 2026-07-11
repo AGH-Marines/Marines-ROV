@@ -40,6 +40,12 @@ Visualization Manager:
       Topic:
         Value: /marines_rov/global_path
       Color: 25; 255; 0
+    - Class: rviz_default_plugins/Path
+      Name: Local Path (hybrid)
+      Enabled: true
+      Topic:
+        Value: /marines_rov/local_path
+      Color: 255; 130; 0
     - Class: rviz_default_plugins/PointCloud2
       Name: Multibeam Point Cloud
       Enabled: true
