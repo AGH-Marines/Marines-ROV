@@ -17,7 +17,7 @@ class ThrusterBridge(Node):
 
         self.__package_data_type = '<BB8f'
 
-        # 🔧 UART zamiast IP
+        # 🔧 UART instead of IP
         self.declare_parameter('serial_port', '/dev/ttyTHS1')
         self.declare_parameter('baudrate', 578000)
 
@@ -93,7 +93,7 @@ class ThrusterBridge(Node):
     def cb_input(self, msg: Float64MultiArray):
         data = self.rearrange(msg.data)
 
-        # dalej masz swój protokół
+        # the rest is your own protocol
         print(data)
         data = pack('<BB8f', 2, 32, *data)
         self.send(data)

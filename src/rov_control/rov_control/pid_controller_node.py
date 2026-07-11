@@ -1,7 +1,5 @@
-#!/usr/bin/env python3
 import math
 import rclpy
-from PyQt5.QtCore import flush
 from rclpy.node import Node
 from rclpy.duration import Duration
 from tf2_ros import Buffer, TransformListener, TransformException
@@ -53,8 +51,19 @@ class PIDControllerNode(Node):
         self.declare_parameter('goal_tolerance', 0.3)
         self.declare_parameter('cmd_vel_timeout', 0.5)
 
+        self.declare_parameter('path_topic', '/marines_rov/global_path')
+        self.declare_parameter('publish_path_complete', True)
+        self.declare_parameter('reset_pid_on_new_path', True)
+
+        self.declare_parameter('forward_motion_only', True)
+        self.declare_parameter('lateral_force_scale', 0.0)
+
         self.map_frame = self.get_parameter('map_frame').value
         self.base_frame = self.get_parameter('base_frame').value
+        self.publish_path_complete = self.get_parameter('publish_path_complete').value
+        self.forward_motion_only = self.get_parameter('forward_motion_only').value
+        self.lateral_force_scale = self.get_parameter('lateral_force_scale').value
+        self.reset_pid_on_new_path = self.get_parameter('reset_pid_on_new_path').value
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -63,14 +72,12 @@ class PIDControllerNode(Node):
         self.path_complete_pub = self.create_publisher(Bool, '/marines_rov/path_complete', 10)
 
         self.create_subscription(Twist, '/marines_rov/cmd_vel', self.cmd_vel_callback, 10)
-        self.create_subscription(Path, '/marines_rov/global_path', self.path_callback, 10)
+        self.create_subscription(Path, self.get_parameter('path_topic').value, self.path_callback, 10)
 
-        # Regulatory dla wszystkich 6 stopni swobody
-        self.pid_x = PID(6.0, 0.1, 1.0, out_limit=60.0)
-        self.pid_y = PID(6.0, 0.1, 1.0, out_limit=60.0)
+        self.pid_x = PID(7.0, 0.2, 1.0, out_limit=60.0)
+        self.pid_y = PID(7.0, 0.2, 1.0, out_limit=60.0)
         self.pid_z = PID(5.0, 0.1, 0.5, out_limit=60.0)
 
-        # Aktywna stabilizacja poziomu (Roll/Pitch docelowo zawsze 0.0)
         self.pid_roll = PID(15.0, 0.5, 2.0, out_limit=40.0)
         self.pid_pitch = PID(15.0, 0.5, 2.0, out_limit=40.0)
         self.pid_yaw = PID(1.8, 0.05, 0.8, out_limit=30.0)
@@ -90,7 +97,7 @@ class PIDControllerNode(Node):
         period = 1.0 / self.get_parameter('control_rate').value
         self.timer = self.create_timer(period, self.control_loop)
 
-        self.get_logger().info('Węzeł Regulatora PID (z Aktywną Stabilizacją 6-DOF) uruchomiony.')
+        self.get_logger().info('PID Controller Node (with Active 6-DOF Stabilization) started.')
 
     def cmd_vel_callback(self, msg):
         self.last_cmd_vel = msg
@@ -99,20 +106,20 @@ class PIDControllerNode(Node):
     def path_callback(self, msg: Path):
         self.path = msg.poses
         self.path_index = 0
-        self.pid_x.reset()
-        self.pid_y.reset()
-        # Wyczyść zapamiętaną pozycję/kurs trzymania - inaczej po zakończeniu tej
-        # trasy robot próbowałby wrócić do miejsca sprzed jej rozpoczęcia zamiast
-        # zostać tam, gdzie faktycznie dopłynął.
-        self.hold_x = None
-        self.hold_y = None
-        self.get_logger().info(f'Nowa ścieżka: {len(self.path)} punktów.')
+
+        if self.reset_pid_on_new_path:
+            self.pid_x.reset()
+            self.pid_y.reset()
+
+            self.hold_x = None
+            self.hold_y = None
+            self.get_logger().info(f'New path: {len(self.path)} points.')
 
     def get_current_pose(self):
         try:
             tf = self.tf_buffer.lookup_transform(self.map_frame, self.base_frame, rclpy.time.Time())
         except TransformException as ex:
-            self.get_logger().warn(f'TF {self.map_frame}->{self.base_frame} niedostępny.', throttle_duration_sec=2.0)
+            self.get_logger().warn(f'TF {self.map_frame}->{self.base_frame} unavailable.', throttle_duration_sec=2.0)
             return None
         t = tf.transform.translation
         q = tf.transform.rotation
@@ -136,17 +143,12 @@ class PIDControllerNode(Node):
             dist = math.sqrt((target.x - cx) ** 2 + (target.y - cy) ** 2 + (target.z - cz) ** 2)
             if dist < self.get_parameter('goal_tolerance').value:
                 self.path_index += 1
-                if self.path_index >= len(self.path):
+                if self.path_index >= len(self.path) and self.publish_path_complete:
                     self.path_complete_pub.publish(Bool(data=True))
-                    print("GOAL", flush=True)
 
             if self.path_index < len(self.path):
                 target = self.path[self.path_index].pose.position
                 sp_x, sp_y, sp_z = target.x, target.y, target.z
-                # Celowo liczymy namiar na bieżąco (do aktualnego celu z aktualnej
-                # pozycji), a nie bierzemy orientacji zapisanej w trasie przy jej
-                # generowaniu - dzięki temu dziób (i czujniki) cały czas są
-                # skierowane w stronę, w którą robot faktycznie płynie.
                 sp_yaw = math.atan2(sp_y - cy, sp_x - cx)
             else:
                 sp_x, sp_y, sp_z, sp_yaw = cx, cy, self.hold_z, self.hold_yaw
@@ -155,17 +157,14 @@ class PIDControllerNode(Node):
             force_y = self.pid_y.update(sp_y - cy, dt)
             force_in_body_frame = False
         else:
-            self.path_complete_pub.publish(Bool(data=False))
+            if self.publish_path_complete:
+                self.path_complete_pub.publish(Bool(data=False))
             twist = self.last_cmd_vel
             stale = (now - self.last_cmd_vel_time) > Duration(seconds=self.get_parameter('cmd_vel_timeout').value)
             deadzone = self.get_parameter('xy_deadzone').value
 
             if stale or (abs(twist.linear.x) < deadzone and abs(twist.linear.y) < deadzone):
                 if self.hold_x is None:
-                    # Zapamiętaj aktualną pozycję I kurs w momencie wejścia w tryb
-                    # trzymania pozycji - inaczej hold_yaw zostaje na domyślnym
-                    # default_yaw (0.0) i robot obraca się z powrotem do zera
-                    # świata zamiast trzymać kierunek, w którym właśnie płynął.
                     self.hold_x, self.hold_y = cx, cy
                     self.hold_yaw = cyaw
                 force_x = self.pid_x.update(self.hold_x - cx, dt)
@@ -177,7 +176,7 @@ class PIDControllerNode(Node):
                 self.pid_x.reset()
                 self.pid_y.reset()
                 scale = self.get_parameter('xy_force_scale').value
-                # cmd_vel jest już w ramie ciała (konwencja teleopu) - nie obracać.
+                # cmd_vel is already in the body frame (teleop convention) - don't rotate it.
                 force_x = twist.linear.x * scale
                 force_y = twist.linear.y * scale
                 force_in_body_frame = True
@@ -195,23 +194,22 @@ class PIDControllerNode(Node):
 
         force_z = self.pid_z.update(sp_z - cz, dt)
 
-        # Aktywna stabilizacja - celem jest zawsze kąt 0.0 (poziom)
         torque_x = self.pid_roll.update(croll, dt)
         torque_y = self.pid_pitch.update(cpitch, dt)
 
         yaw_error = normalize_angle(sp_yaw - cyaw)
         torque_z = self.pid_yaw.update(yaw_error, dt)
 
-        # force_x/force_y z PID-ów pozycji są policzone w osiach świata (błąd
-        # pozycji X/Y), a thruster_allocator_node oczekuje siły w ramie ciała
-        # robota - trzeba obrócić o bieżący yaw, inaczej robot pcha się w
-        # kierunku świata zamiast przed siebie, nawet gdy dziób jest już
-        # skierowany na cel. cmd_vel z teleopu jest już w ramie ciała.
         if force_in_body_frame:
             body_force_x, body_force_y = force_x, force_y
         else:
             body_force_x = force_x * math.cos(cyaw) + force_y * math.sin(cyaw)
             body_force_y = -force_x * math.sin(cyaw) + force_y * math.cos(cyaw)
+
+            if self.forward_motion_only:
+                heading_gate = max(0.0, math.cos(yaw_error))
+                body_force_x *= heading_gate
+                body_force_y *= self.lateral_force_scale
 
         wrench_msg = Wrench()
         wrench_msg.force.x = body_force_x

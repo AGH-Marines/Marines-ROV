@@ -43,5 +43,5 @@ if __name__ == '__main__':
         data = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
         data = pack('<BB6f', 2, 32, *data)
         bridge.send(data)
-        print("Wysłano:", data)
+        print("Sent:", data)
         time.sleep(1)
