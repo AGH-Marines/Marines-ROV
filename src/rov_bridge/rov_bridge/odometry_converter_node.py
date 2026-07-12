@@ -46,18 +46,25 @@ class OdometryConverterNode(Node):
         out.twist = msg.twist
 
         # Stonefish never fills in the covariance (all zeros). The "odometry" sensor
-        # in underwater_world.scn has an explicitly set position="0.05" noise (std.
-        # dev. in meters, see Odometry::setNoise in Stonefish) - variance = 0.05^2.
-        # NOTE: a variance of 0.0 does NOT mean "perfect measurement" - in a Kalman
+        # in rov_robot.scn has an explicitly set position="0.05"/velocity="0.01" noise
+        # (std. dev. in meters/(m/s), see Odometry::setNoise in Stonefish) - variance
+        # = std^2. A variance of 0.0 does NOT mean "perfect measurement" - in a Kalman
         # filter that's R=0, i.e. "trust this measurement 100%, ignore the estimate".
-        # With real noise on the input (0.05m) this causes violent, continuous
-        # corrections (the EKF "jumps" on every noisy reading, 100x/s), and through
-        # the cross-correlated state matrix it can throw off even the orientation,
-        # even though we don't fuse it here.
-        # pose_cov = list(out.pose.covariance)
-        # for idx in (0, 7, 14):  # X, Y, Z
-        #     pose_cov[idx] = 0
-        out.pose.covariance = out.pose.covariance
+        # With real noise on the input this caused violent, continuous corrections
+        # (the EKF snapping to every noisy reading, 100x/s). Fix: report the actual
+        # variance so the EKF weighs this measurement against its own prediction
+        # instead of overwriting the state with it every sample.
+        pos_variance = 0.05 ** 2
+        vel_variance = 0.01 ** 2
+        pose_cov = list(out.pose.covariance)
+        for idx in (0, 7, 14):  # X, Y, Z
+            pose_cov[idx] = pos_variance
+        out.pose.covariance = pose_cov
+
+        twist_cov = list(out.twist.covariance)
+        for idx in (0, 7, 14):  # dX, dY, dZ
+            twist_cov[idx] = vel_variance
+        out.twist.covariance = twist_cov
 
         self.pub.publish(out)
 
