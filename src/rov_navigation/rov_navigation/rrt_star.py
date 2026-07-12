@@ -74,8 +74,8 @@ class RRTStarPlanner:
     def plan(self, start, goal, goal_tolerance=0.3, seed_path=None, refine_iterations=250):
         start = np.asarray(start, dtype=float)
         goal = np.asarray(goal, dtype=float)
-        if self.collision_fn(start) or self.collision_fn(goal):
-            return None  # start/goal inside an obstacle
+        # if self.collision_fn(start) or self.collision_fn(goal):
+        #     return None  # start/goal inside an obstacle
 
         tree = [RRTNode(start, parent=None, cost=0.0)]
         best_goal_node = None

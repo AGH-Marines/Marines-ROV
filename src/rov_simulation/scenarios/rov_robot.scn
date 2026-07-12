@@ -175,6 +175,7 @@
 
        <sensor name="odometry" type="odometry" rate="100.0">
           <link name="base_link"/>
+		  <noise position="0.05" velocity="0.01" angle="0.1" angular_velocity="0.05"/>
           <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
           <ros_publisher topic="/marines_rov/odometry"/>
        </sensor>

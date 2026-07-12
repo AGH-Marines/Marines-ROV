@@ -105,10 +105,13 @@ class PlannerNode(Node):
                 return False
         return True
 
-    def _next_waypoint(self, position, waypoints):
+    def _nearest_segment_index(self, position, waypoints):
+        """Index i such that the robot's current position projects closest onto
+        segment (waypoints[i], waypoints[i+1]) - i.e. which leg of the stored
+        route it's currently on."""
         pos = np.asarray(position, dtype=float)
         best_d = float('inf')
-        best_point = np.asarray(waypoints[-1], dtype=float)
+        best_i = 0
         for i in range(len(waypoints) - 1):
             a, b = np.asarray(waypoints[i], dtype=float), np.asarray(waypoints[i + 1], dtype=float)
             ab = b - a
@@ -116,8 +119,26 @@ class PlannerNode(Node):
             t = 0.0 if denom < 1e-9 else float(np.clip(np.dot(pos - a, ab) / denom, 0.0, 1.0))
             d = float(np.linalg.norm(pos - (a + t * ab)))
             if d < best_d:
-                best_d, best_point = d, b
-        return best_point
+                best_d, best_i = d, i
+        return best_i
+
+    def _next_waypoint(self, position, waypoints):
+        i = self._nearest_segment_index(position, waypoints)
+        return np.asarray(waypoints[i + 1], dtype=float)
+
+    def _trim_seed(self, position, waypoints):
+        """Drops already-passed waypoints before handing the old route to RRT*
+        as a seed. Without this, _seed_tree() walks the seed IN ORDER starting
+        from waypoints[0] - which the robot has long since left behind - and
+        happily builds robot -> (old, passed) waypoint -> ... -> goal, since
+        that's geometrically collision-free (the robot just came from there).
+        refine_iterations then only gets a limited budget to rewire that
+        backtrack away, and often doesn't: the robot visibly reverses to a
+        waypoint it already passed before continuing towards the goal."""
+        if len(waypoints) < 2:
+            return waypoints
+        i = self._nearest_segment_index(position, waypoints)
+        return waypoints[i + 1:]
 
     def replan_check(self):
         if self.current_goal is None:
@@ -141,10 +162,11 @@ class PlannerNode(Node):
         goal = (goal_msg.pose.position.x, goal_msg.pose.position.y, goal_msg.pose.position.z)
 
         planner = self.make_planner()
+        seed_path = self._trim_seed(start, self.current_waypoints) if self.current_waypoints else None
         waypoints = planner.plan(
             start, goal,
             goal_tolerance=self.get_parameter('goal_tolerance').value,
-            seed_path=self.current_waypoints,
+            seed_path=seed_path,
             refine_iterations=self.get_parameter('refine_iterations').value,
         )
 

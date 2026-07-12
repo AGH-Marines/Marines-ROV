@@ -18,7 +18,9 @@ def _lookup_pose(node, tf_buffer, map_frame, base_frame):
         # slightly behind wall-clock time - which silently stalls this lookup
         # forever (the exception is swallowed below).
         tf = tf_buffer.lookup_transform(map_frame, base_frame, Time())
-    except TransformException:
+    except TransformException as ex:
+        node.get_logger().warn(f"_lookup_pose: TF {map_frame}->{base_frame} niedostępny: {ex}",
+                                throttle_duration_sec=1.0)
         return None
     t = tf.transform.translation
     q = tf.transform.rotation
@@ -182,12 +184,10 @@ class MonitorMission(py_trees.behaviour.Behaviour):
     stale or unrelated path (see DiveToDepth), which previously made the mission
     report success within one tick of publishing a new goal."""
 
-    def __init__(self, name="MonitorPathExecution", key=None, static_goal=None,
-                 timeout_sec=120.0, tolerance=0.3):
+    def __init__(self, name="MonitorPathExecution", key=None, static_goal=None, tolerance=0.3):
         super().__init__(name)
         self.key = key
         self.static_goal = static_goal
-        self.timeout_sec = timeout_sec
         self.tolerance = tolerance
         self._start_time = None
         if key is not None:
@@ -210,9 +210,11 @@ class MonitorMission(py_trees.behaviour.Behaviour):
         if goal is not None and pose is not None:
             gx, gy, gz, _ = goal
             cx, cy, cz, _ = pose
-            if math.dist((cx, cy, cz), (gx, gy, gz)) < self.tolerance:
+            dist = math.dist((cx, cy, cz), (gx, gy, gz))
+            if dist < self.tolerance:
                 return py_trees.common.Status.SUCCESS
-        elapsed = (self.node.get_clock().now() - self._start_time).nanoseconds / 1e9
-        if elapsed > self.timeout_sec:
-            return py_trees.common.Status.FAILURE
+        else:
+            self.node.get_logger().warn(
+                f"{self.name}: brak danych - goal={goal}, pose={pose}",
+                throttle_duration_sec=1.0)
         return py_trees.common.Status.RUNNING

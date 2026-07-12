@@ -36,10 +36,10 @@ class LocalPlannerNode(Node):
         self.declare_parameter('base_frame', 'base_link')
         self.declare_parameter('rate', 10.0)
         self.declare_parameter('lookahead_dist', 1.5)     # how far ahead of the robot pure-pursuit aims [m]
-        self.declare_parameter('repulsion_radius', 0.5)   # range of the repulsion effect [m]
-        self.declare_parameter('repulsion_gain', 0.3)     # repulsion strength
+        self.declare_parameter('repulsion_radius', 1)   # range of the repulsion effect [m]
+        self.declare_parameter('repulsion_gain', 0.5)    # repulsion strength
         self.declare_parameter('max_lateral_offset', 2.0) # max carrot offset from the path [m]
-        self.declare_parameter('goal_tolerance', 0.3)     # when to consider the global goal reached [m]
+        self.declare_parameter('goal_tolerance', 0.2)     # when to consider the global goal reached [m]
         self.declare_parameter('robot_radius', 0.3)
 
         self.map_frame = self.get_parameter('map_frame').value
@@ -144,7 +144,7 @@ class LocalPlannerNode(Node):
         if float(np.linalg.norm(goal - robot)) < self.get_parameter('goal_tolerance').value:
             self.complete_pub.publish(Bool(data=True))
             self._publish_carrot(goal, robot)
-            self.get_logger().info("goal reached")
+            # self.get_logger().info("goal reached")
             return
         self.complete_pub.publish(Bool(data=False))
 
