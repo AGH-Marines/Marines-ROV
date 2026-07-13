@@ -1,0 +1,81 @@
+<?xml version="1.0"?>
+<scenario>
+    <environment>
+        <ned latitude="41.7" longitude="3.0"/>
+        <ocean>
+            <water_density value="1000.0"/>
+            <current velocity="0.0 0.0 0.0"/>
+        </ocean>
+        <atmosphere>
+            <sun direction="0.5 0.5 1.0"/>
+        </atmosphere>
+    </environment>
+
+    <materials>
+        <material name="Neutral" density="1000.0" restitution="0.5"/>
+        <material name="Rock" density="3000.0" restitution="0.8"/>
+        <material name="Aluminium" density="2700.0" restitution="0.7"/>
+        <material name="Steel" density="7800.0" restitution="0.2"/>
+    </materials>
+
+    <looks>
+        <look name="black" rgb="0.0 0.0 0.0" roughness="0.3"/>
+
+        <look name="pool_tiles" rgb="0.8 0.9 0.9" roughness="0.7"/>
+        <look name="wall_color" rgb="0.6 0.7 0.7" roughness="0.5"/>
+        <look name="box_red" rgb="1.0 0.2 0.2" roughness="0.5"/>
+    </looks>
+
+    <static name="PoolBottom" type="plane">
+        <material name="Rock"/>
+        <look name="pool_tiles"/>
+        <world_transform rpy="0.0 0.0 0.0" xyz="0.0 0.0 20.0"/>
+    </static>
+
+    <static name="WallNorth" type="box">
+        <dimensions xyz="0.2 10.0 20.0"/>
+        <material name="Rock"/>
+        <look name="wall_color"/>
+        <world_transform rpy="0.0 0.0 0.0" xyz="26.0 0.0 10.0"/>
+    </static>
+
+    <static name="WallSouth" type="box">
+        <dimensions xyz="0.2 10.0 20.0"/>
+        <material name="Rock"/>
+        <look name="wall_color"/>
+        <world_transform rpy="0.0 0.0 0.0" xyz="-1.0 0.0 10.0"/>
+    </static>
+
+    <static name="WallEast" type="box">
+        <dimensions xyz="28.0 0.2 20.0"/>
+        <material name="Rock"/>
+        <look name="wall_color"/>
+        <world_transform rpy="0.0 0.0 0.0" xyz="13.0 5.0 10.0"/>
+    </static>
+
+    <static name="WallWest" type="box">
+        <dimensions xyz="28.0 0.2 20.0"/>
+        <material name="Rock"/>
+        <look name="wall_color"/>
+        <world_transform rpy="0.0 0.0 0.0" xyz="13.0 -5.0 10.0"/>
+    </static>
+
+    <!-- Wall across the corridor with a parametrized window opening -->
+    <include file="$(find rov_simulation)/scenarios/window_gate.scn">
+        <arg name="name" value="WindowWall"/>
+        <arg name="wall_x" value="7.0"/>
+        <arg name="corridor_width" value="10.0"/>
+        <arg name="wall_height" value="20.0"/>
+        <arg name="thickness" value="0.3"/>
+        <arg name="window_width" value="2"/>
+        <arg name="window_height" value="2"/>
+        <arg name="window_center_y" value="{window_center_y}"/>
+        <arg name="window_center_z" value="{window_center_z}"/>
+        <arg name="material" value="Rock"/>
+        <arg name="look" value="box_red"/>
+    </include>
+
+    <include file="$(find rov_simulation)/scenarios/rov_robot.scn">
+        <arg name="robot_name" value="ROV"/>
+    </include>
+</scenario>

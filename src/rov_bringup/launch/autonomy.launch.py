@@ -45,10 +45,19 @@ def generate_launch_description():
     nav_mode_arg = DeclareLaunchArgument(
         'nav_mode', default_value='hybrid',
         description="'direct' = RRT* only (as before); 'hybrid' = RRT* + reactive APF layer")
+    world_arg = DeclareLaunchArgument(
+        'world', default_value='underwater',
+        choices=['underwater', 'labirynt', 'window_wall'],
+        description='Wariant mapy symulacji do wczytania')
+    world = LaunchConfiguration('world')
 
     include = _include
 
-    sim_launch = include('rov_simulation', 'sim_launch.py', condition=IfCondition(use_sim))
+    sim_launch = include(
+        'rov_simulation', 'sim_launch.py',
+        condition=IfCondition(use_sim),
+        launch_arguments={'world': world}.items(),
+    )
     localization_launch = include('rov_localization', 'localization_launch.py')
     mapping_launch = include('rov_mapping', 'mapping_launch.py')
     navigation_launch = include('rov_navigation', 'navigation_launch.py')
@@ -94,7 +103,7 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        use_sim_arg, nav_mode_arg,
+        use_sim_arg, nav_mode_arg, world_arg,
         sim_launch, localization_launch, mapping_launch, navigation_launch,
         actuation_launch, mission_launch, dvl_converter, imu_filter,
         zed_camera_tf, robot_state_publisher, rviz_node,

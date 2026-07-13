@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<scenario>
+    <!--
+    Parametrized wall-with-window, built from 4 box segments.
+    Required args: name, wall_x, corridor_width, wall_height, thickness,
+                    window_width, window_height, window_center_y, window_center_z,
+                    material, look
+    -->
+
+    <static name="$(arg name)_Bottom" type="box">
+        <dimensions xyz="$(arg thickness) $(arg corridor_width) ${$(arg window_center_z)-$(arg window_height)/2}"/>
+        <material name="$(arg material)"/>
+        <look name="$(arg look)"/>
+        <world_transform rpy="0.0 0.0 0.0"
+            xyz="$(arg wall_x) 0.0 ${($(arg window_center_z)-$(arg window_height)/2)/2}"/>
+    </static>
+
+    <static name="$(arg name)_Top" type="box">
+        <dimensions xyz="$(arg thickness) $(arg corridor_width) ${$(arg wall_height)-$(arg window_center_z)-$(arg window_height)/2}"/>
+        <material name="$(arg material)"/>
+        <look name="$(arg look)"/>
+        <world_transform rpy="0.0 0.0 0.0"
+            xyz="$(arg wall_x) 0.0 ${$(arg wall_height)-($(arg wall_height)-$(arg window_center_z)-$(arg window_height)/2)/2}"/>
+    </static>
+
+    <static name="$(arg name)_Left" type="box">
+        <dimensions xyz="$(arg thickness) ${$(arg corridor_width)/2+$(arg window_center_y)-$(arg window_width)/2} $(arg window_height)"/>
+        <material name="$(arg material)"/>
+        <look name="$(arg look)"/>
+        <world_transform rpy="0.0 0.0 0.0"
+            xyz="$(arg wall_x) ${(-$(arg corridor_width)/2+$(arg window_center_y)-$(arg window_width)/2)/2} $(arg window_center_z)"/>
+    </static>
+
+    <static name="$(arg name)_Right" type="box">
+        <dimensions xyz="$(arg thickness) ${$(arg corridor_width)/2-$(arg window_center_y)-$(arg window_width)/2} $(arg window_height)"/>
+        <material name="$(arg material)"/>
+        <look name="$(arg look)"/>
+        <world_transform rpy="0.0 0.0 0.0"
+            xyz="$(arg wall_x) ${($(arg window_center_y)+$(arg window_width)/2+$(arg corridor_width)/2)/2} $(arg window_center_z)"/>
+    </static>
+</scenario>
