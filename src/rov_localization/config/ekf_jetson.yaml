@@ -1,0 +1,37 @@
+ekf_filter_node:
+  ros__parameters:
+    frequency: 30.0
+    sensor_timeout: 0.1
+    two_d_mode: false # The robot moves in full 3D (Z, Pitch, Roll are active)
+
+    # The ZED (autonomy_jetson.launch.py) already broadcasts odom -> base_link
+    # itself (zed_camera.launch.py is launched with publish_tf: true so it can
+    # build the TF tree on its own). If this node also published TF, both nodes
+    # would broadcast the same transform and fight over it, corrupting the tree
+    # that pid_controller_node/planner_node/behaviors.py read via tf2. So here
+    # the EKF only fuses sensors into /odometry/filtered and stays out of TF.
+    publish_tf: false
+
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom
+
+    # No simulated start offset applies on the real ROV (see the comment on
+    # initial_state in ekf.yaml) - start from the origin.
+    initial_state: [0.0, 0.0, 0.0,  0.0, 0.0, 0.0,
+                     0.0, 0.0, 0.0,  0.0, 0.0, 0.0,
+                     0.0, 0.0, 0.0]
+
+    # 1. ZED visual-inertial odometry - the only real localization source wired
+    # up so far. Its VIO already fuses the camera's own IMU, so we take full
+    # pose + velocity from it. rov_bridge's dvl_converter_node/odometry_converter_node
+    # and the /marines_rov/imu topic are Stonefish-only (no real DVL/IMU driver
+    # exists yet in this repo), so they are intentionally not listed here - add
+    # a twist0 (DVL) / imu0 block once real drivers exist.
+    odom0: /zed/zed_node/odom
+    odom0_config: [true,  true,  true,   # X, Y, Z
+                   true,  true,  true,   # Roll, Pitch, Yaw
+                   true,  true,  true,   # dX, dY, dZ
+                   true,  true,  true,   # dRoll, dPitch, dYaw
+                   false, false, false]  # Accelerations

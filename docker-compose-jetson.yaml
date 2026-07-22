@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  rov-ros2-dev:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.jetson
+      args:
+        USERNAME: dev
+        UID: 1000
+        GID: 1000
+    image: rov_ros2_dev_image
+    container_name: jetson_setup
+    user: dev
+    working_dir: /home/dev/ros2_ws
+
+    command: sleep infinity
+
+    privileged: true
+    network_mode: "host"
+
+    cap_add:
+      - SYS_PTRACE
+
+    security_opt:
+      - seccomp:unconfined
+      - apparmor:unconfined
+
+    device_cgroup_rules:
+      - 'c *:* rmw'
+
+    volumes:
+      # Mount the workspace
+      - .:/home/dev/ros2_ws:rw
+      # - ~/.Xauthority:/home/dev/.Xauthority:rw # Uncomment if you run into GUI permission issues
+      - /usr/local/cuda:/usr/local/cuda:ro
+      - /usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu/tegra:ro
+      - /usr/local/zed:/usr/local/zed:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - /home/dev/zed_resources:/usr/local/zed/resources:rw
+      - /dev/bus/usb:/dev/bus/usb
+      - /dev/input:/dev/input
+      - /dev/video0:/dev/video0
+      - /dev/video1:/dev/video1
+    environment:
+      - DISPLAY=${DISPLAY}
+      - XAUTHORITY=/home/dev/.Xauthority
+      - PYTHONPATH=src:install/lib/python3.10/site-packages:/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages
+      # NVIDIA environment variables
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+
+    # GPU passthrough section (replaces --gpus all from runArgs)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+

@@ -1,3 +1,7 @@
 [submodule "src/simulation/stonefish_ros2"]
 	path = src/simulation/stonefish_ros2
 	url = https://github.com/AGH-Marines/stonefish_ros2.git
+[submodule "src/zed-ros2-wrapper"]
+	path = src/zed-ros2-wrapper
+	url = https://github.com/stereolabs/zed-ros2-wrapper.git
+	branch = humble-v4.1.4
