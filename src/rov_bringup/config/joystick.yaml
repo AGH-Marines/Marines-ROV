@@ -1,8 +1,27 @@
 teleop_twist_joy_node:
   ros__parameters:
-    axis_linear.x: 1       # left stick vertical -> surge (X)
-    axis_linear.y: 0       # left stick horizontal -> sway (Y)
-    scale_linear.x: 1.0
-    scale_linear.y: 1.0
-    enable_button: 4       # e.g. left bumper, "dead man's switch"
+    # --- Konfiguracja przycisków aktywacji ---
     require_enable_button: true
+    enable_button: 9        # <-- TUTAJ zmieniasz ID przycisku "dead-man switch"
+    enable_turbo_button: 10   # Opcjonalnie: przycisk aktywujący szybszy tryb
+
+    # --- Mapowanie osi ruchu ---
+    axis_linear:
+      x: 1  # Lewa gałka (przód/tył)
+      y: 0  # Lewa gałka (lewo/prawo) - dla ruchu bocznego
+      z: 2  # Np. triggery do zanurzania w ROV
+
+    scale_linear:
+      x: 1.0
+      y: 1.0
+      z: 1.0
+
+    axis_angular:
+      yaw: 3   # Prawa gałka (obrót w lewo/prawo)
+      pitch: 4 # Prawa gałka (góra/dół)
+      roll: 5
+
+    scale_angular:
+      yaw: 1.0
+      pitch: 1.0
+      roll: 1.0

@@ -254,9 +254,10 @@ class PIDControllerNode(Node):
             if not stale:
                 if abs(twist.linear.z) > deadzone:
                     self.hold_z -= twist.linear.z * 1.5 * dt
-                    self.hold_z = max(0.1, self.hold_z)
+                    self.hold_z = min(-0.1, self.hold_z)
                     # self.get_logger().info(f"TELEOP: Aktualizacja hold_z={self.hold_z:.3f}")
-
+                else:
+                    self.hold_z = cz
                 if abs(twist.angular.z) > deadzone:
                     self.hold_yaw += twist.angular.z * 1.0 * dt
                     self.hold_yaw = normalize_angle(self.hold_yaw)

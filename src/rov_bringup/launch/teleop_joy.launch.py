@@ -14,8 +14,6 @@ def generate_launch_description():
     use_sim = LaunchConfiguration('use_sim')
     enable_mapping = LaunchConfiguration('enable_mapping')
 
-    joystick_config = os.path.join(get_package_share_directory('rov_bringup'), 'config', 'joystick.yaml')
-
     def include(pkg, launch_file, **kwargs):
         return IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
@@ -31,18 +29,26 @@ def generate_launch_description():
 
     joy_node = Node(package='joy', executable='joy_node', name='joy_node', output='screen')
     teleop_node = Node(
-        package='teleop_twist_joy', executable='teleop_node', name='teleop_twist_joy_node',
-        parameters=[joystick_config], output='screen',
-        remappings=[('cmd_vel', '/marines_rov/cmd_vel')],
+        package='rov_control',
+        executable='rov_teleop',
+        name='rov_teleop_node',  # Zmieniona nazwa dla porządku
+        output='screen'
     )
 
     rviz_config = os.path.join(get_package_share_directory('rov_bringup'), 'rviz', 'default_view.rviz')
     rviz_node = Node(package='rviz2', executable='rviz2', name='rviz2', arguments=['-d', rviz_config])
+
+    imu_filter = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='imu_static_tf',
+        arguments=['0', '0', '0', '0', '0', '0', 'base_link', 'ROV/imu_filter']
+    )
 
     return LaunchDescription([
         use_sim_arg, enable_mapping_arg,
         sim_launch, localization_launch, mapping_launch,
         control_launch, actuation_launch,
         joy_node, teleop_node,
-        rviz_node,
+        rviz_node, imu_filter,
     ])
