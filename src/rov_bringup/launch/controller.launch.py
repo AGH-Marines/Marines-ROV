@@ -34,7 +34,18 @@ def generate_launch_description():
 
     rqt_node = Node(package='rqt_gui', executable='rqt_gui', name='rqt_gui')
 
+    # Just a viewer - assumes the ZED driver itself is already running (started
+    # by teleop_jetson.launch.py / autonomy_jetson.launch.py). Does not launch
+    # zed_wrapper here, since a second zed_node fighting the first one over the
+    # same physical camera would just fail to open it.
+    zed_image_view = Node(
+        package='rqt_image_view',
+        executable='rqt_image_view',
+        name='rqt_image_view',
+        arguments=['/zed/zed_node/rgb/image_rect_color'],
+    )
+
     return LaunchDescription([
         path_topic_arg, publish_path_complete_arg, reset_pid_on_new_path_arg,
-        control_launch, rviz_node, rqt_node,
+        control_launch, rviz_node, rqt_node, zed_image_view,
     ])
