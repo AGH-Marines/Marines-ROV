@@ -1,8 +1,9 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
@@ -17,11 +18,27 @@ def _include(pkg, launch_file, **kwargs):
 def generate_launch_description():
     include = _include
 
-    # Same real-hardware wiring as autonomy_jetson.launch.py (ZED odometry/depth
-    # feeding the EKF and octomap), but without navigation/mission/control - this
-    # file only brings up sensors + joystick teleop. The PID controller and any
-    # GUIs (RViz/rqt) are started separately by controller.launch.py so they can
-    # be killed/restarted independently of the sensor/teleop stack.
+    # Real-hardware wiring (ZED odometry/depth feeding the EKF and octomap)
+    # plus the PID controller - everything that needs to run ON THE JETSON
+    # for stabilized teleop. Bundled into one file (instead of a separate
+    # controller.launch.py) since there's no reason to launch two files on
+    # the same machine. The joystick is plugged into the topside/operator
+    # computer, not the ROV, so joy_node/rov_teleop live in
+    # topside.launch.py instead and reach this machine over the ROS2/DDS
+    # network, same for RViz/rqt/camera view.
+    path_topic_arg = DeclareLaunchArgument('path_topic', default_value='/marines_rov/global_path')
+    publish_path_complete_arg = DeclareLaunchArgument('publish_path_complete', default_value='true')
+    reset_pid_on_new_path_arg = DeclareLaunchArgument('reset_pid_on_new_path', default_value='true')
+
+    control_launch = include(
+        'rov_control', 'control_launch.py',
+        launch_arguments={
+            'path_topic': LaunchConfiguration('path_topic'),
+            'publish_path_complete': LaunchConfiguration('publish_path_complete'),
+            'reset_pid_on_new_path': LaunchConfiguration('reset_pid_on_new_path'),
+        }.items(),
+    )
+
     localization_launch = include(
         'rov_localization', 'localization_launch.py',
         launch_arguments={'ekf_config': 'ekf_jetson.yaml'}.items(),
@@ -102,17 +119,10 @@ def generate_launch_description():
         ],
     )
 
-    joy_node = Node(package='joy', executable='joy_node', name='joy_node', output='screen')
-    teleop_node = Node(
-        package='rov_control',
-        executable='rov_teleop',
-        name='rov_teleop_node',
-        output='screen'
-    )
-
     return LaunchDescription([
+        path_topic_arg, publish_path_complete_arg, reset_pid_on_new_path_arg,
+        control_launch,
         localization_launch, mapping_launch, actuation_launch,
         dvl_converter, imu_filter,
         zed_camera_tf, zed_base_link_tf, zed_launch, robot_state_publisher,
-        joy_node, teleop_node,
     ])
