@@ -24,14 +24,25 @@ ekf_filter_node:
                      0.0, 0.0, 0.0]
 
     # 1. ZED visual-inertial odometry - the only real localization source wired
-    # up so far. Its VIO already fuses the camera's own IMU, so we take full
-    # pose + velocity from it. rov_bridge's dvl_converter_node/odometry_converter_node
-    # and the /marines_rov/imu topic are Stonefish-only (no real DVL/IMU driver
-    # exists yet in this repo), so they are intentionally not listed here - add
-    # a twist0 (DVL) / imu0 block once real drivers exist.
+    # up so far. Position/linear velocity comes from here; orientation and
+    # angular velocity are left to the dedicated imu0 block below instead (same
+    # split as ekf.yaml's sim config) so the same rotation isn't fused twice
+    # from what is, under the hood, the same physical IMU. rov_bridge's
+    # dvl_converter_node/odometry_converter_node and the /marines_rov/imu topic
+    # are Stonefish-only (no real DVL driver exists yet in this repo), so
+    # twist0 (DVL) is intentionally not listed here - add it once a real driver exists.
     odom0: /zed/zed_node/odom
     odom0_config: [true,  true,  true,   # X, Y, Z
-                   true,  true,  true,   # Roll, Pitch, Yaw
+                   false, false, false,  # Roll, Pitch, Yaw (taken from imu0 below)
                    true,  true,  true,   # dX, dY, dZ
-                   true,  true,  true,   # dRoll, dPitch, dYaw
+                   false, false, false,  # dRoll, dPitch, dYaw (taken from imu0 below)
                    false, false, false]  # Accelerations
+
+    # 2. ZED's own IMU - orientation and angular velocity.
+    imu0: /zed/zed_node/imu/data
+    imu0_config: [false, false, false,  # X, Y, Z
+                  true,  true,  true,   # Roll, Pitch, Yaw
+                  false, false, false,  # dX, dY, dZ
+                  true,  true,  true,   # dRoll, dPitch, dYaw
+                  false, false, false]  # Accelerations
+    imu0_remove_gravitational_acceleration: true

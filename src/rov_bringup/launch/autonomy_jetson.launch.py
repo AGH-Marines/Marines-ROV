@@ -109,16 +109,19 @@ def generate_launch_description():
     # there is no launch argument to rename it to "base_link". So it publishes
     # odom -> zed_camera_link on its own, disconnected from our base_link tree
     # (imu_static_tf/zed_camera_static_tf/multibeam_static_tf, all rooted at
-    # base_link) unless we bridge the two with the inverse of the same mounting
-    # offset used above for zed_camera_tf (translation/rotation inverted, see
-    # scratchpad calc: R^T and -R^T*t).
+    # base_link) unless we bridge the two. zed_camera_link already uses the
+    # same X-fwd/Y-left/Z-up convention as base_link (ROS_COORDINATE_SYSTEM =
+    # RIGHT_HANDED_Z_UP_X_FWD in zed_camera_component.cpp), and the camera is
+    # mounted facing straight forward (see rov_visual.urdf: camera box at
+    # xyz="0.35 0 0" rpy="0 0 0"), so this bridge is a pure translation - no
+    # rotation needed.
     zed_base_link_tf = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
         name='zed_base_link_tf',
         arguments=[
-            '--x', '0.0', '--y', '0.0', '--z', '-0.35',
-            '--qx', '0.5', '--qy', '-0.5', '--qz', '0.5', '--qw', '0.5',
+            '--x', '-0.35', '--y', '0.0', '--z', '0.0',
+            '--roll', '0.0', '--pitch', '0.0', '--yaw', '0.0',
             '--frame-id', 'zed_camera_link',
             '--child-frame-id', 'base_link',
         ],
