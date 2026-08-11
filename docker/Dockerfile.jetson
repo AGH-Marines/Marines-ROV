@@ -1,0 +1,271 @@
+# This is an auto generated Dockerfile for ros:ros-core
+# generated from docker_images_ros2/create_ros_core_image.Dockerfile.em
+FROM ubuntu:jammy
+
+# setup timezone
+RUN echo 'Etc/UTC' > /etc/timezone && \
+    ln -s /usr/share/zoneinfo/Etc/UTC /etc/localtime && \
+    apt-get update && \
+    apt-get install -q -y --no-install-recommends tzdata && \
+    rm -rf /var/lib/apt/lists/*
+
+# install packages
+RUN apt-get update && apt-get install -q -y --no-install-recommends \
+    dirmngr \
+    gnupg2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# setup keys
+RUN set -eux; \
+       key='C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654'; \
+       export GNUPGHOME="$(mktemp -d)"; \
+       gpg --batch --keyserver keyserver.ubuntu.com --recv-keys "$key"; \
+       mkdir -p /usr/share/keyrings; \
+       gpg --batch --export "$key" > /usr/share/keyrings/ros2-latest-archive-keyring.gpg; \
+       gpgconf --kill all; \
+       rm -rf "$GNUPGHOME"
+
+# setup sources.list
+RUN echo "deb [ signed-by=/usr/share/keyrings/ros2-latest-archive-keyring.gpg ] http://packages.ros.org/ros2/ubuntu jammy main" > /etc/apt/sources.list.d/ros2-latest.list
+
+# setup environment
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+
+ENV ROS_DISTRO=humble
+
+# install ros2 packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-humble-ros-core=0.10.0-1* \
+    && rm -rf /var/lib/apt/lists/*
+
+# install bootstrap tools
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    build-essential \
+    git \
+    python3-colcon-common-extensions \
+    python3-colcon-mixin \
+    python3-rosdep \
+    python3-vcstool \
+    && rm -rf /var/lib/apt/lists/*
+
+# bootstrap rosdep
+RUN rosdep init && \
+  rosdep update --rosdistro $ROS_DISTRO
+
+# setup colcon mixin and metadata
+RUN colcon mixin add default \
+      https://raw.githubusercontent.com/colcon/colcon-mixin-repository/master/index.yaml && \
+    colcon mixin update && \
+    colcon metadata add default \
+      https://raw.githubusercontent.com/colcon/colcon-metadata-repository/master/index.yaml && \
+    colcon metadata update
+
+# install ros2 packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-humble-ros-base=0.10.0-1* \
+    && rm -rf /var/lib/apt/lists/*
+
+# install ros2 packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-humble-desktop=0.10.0-1* \
+    && rm -rf /var/lib/apt/lists/*
+
+
+ARG ROS_PACKAGE=ros_base \
+    ROS_VERSION=humble
+
+ENV ROS_DISTRO=${ROS_VERSION} \
+    ROS_ROOT=/opt/ros/${ROS_VERSION} \
+    ROS_PYTHON_VERSION=3 \
+    RMW_IMPLEMENTATION=rmw_fastrtps_cpp \
+    DEBIAN_FRONTEND=noninteractive \
+    SHELL=/bin/bash
+
+RUN apt-get update \
+    && apt-get install -y \
+    nano \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG USERNAME=dev
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
+
+# Create a non-root user
+RUN groupadd --gid $USER_GID $USERNAME \
+    && useradd -s /bin/bash --uid $USER_UID --gid $USER_GID -m $USERNAME \
+    && mkdir /home/$USERNAME/.config && chown $USER_UID:$USER_GID /home/$USERNAME/.config
+    
+# Set up sudo
+RUN apt-get update \
+    && apt-get install -y sudo \
+    && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME\
+    && chmod 0440 /etc/sudoers.d/$USERNAME \
+    && rm -rf /var/lib/apt/lists/*
+
+# Only on server
+# Add vglusers group (GID must match host!)
+# ARG VGL_GID=1001
+# RUN groupadd -g $VGL_GID vglusers || true \
+#     && usermod -aG vglusers $USERNAME
+
+RUN apt-get update \
+    && apt-get install -y jstest-gtk\
+    usbutils \
+    xxd \
+    net-tools \
+    iputils-ping \
+    fzf \
+    python3-pip \
+    python3-scipy \
+    wget \
+    libgeographic-dev \
+    mesa-utils \
+    && rm -rf /ver/lib/apt/lists/*
+
+# Download ROS2 packages
+# ros-$ROS_DISTRO-diagnostic-updater is listed explicitly (not just pulled in
+# transitively via robot-localization), because in practice apt would sometimes
+# pick an older version of it than the one robot_localization was built against,
+# which resulted in a "libdiagnostic_updater.so: cannot open shared object file"
+# error at ekf_node startup. Explicitly requesting the latest version in the same
+# apt transaction limits the risk of that mismatch.
+RUN apt-get update \
+    && apt-get install -y \
+    ros-$ROS_DISTRO-joint-state-publisher \
+    ros-$ROS_DISTRO-joint-state-publisher-gui\
+    ros-$ROS_DISTRO-tf-transformations \
+    ros-$ROS_DISTRO-diagnostic-updater \
+    ros-$ROS_DISTRO-robot-localization \
+    ros-$ROS_DISTRO-imu-tools \
+    ros-$ROS_DISTRO-plotjuggler-ros \
+    ros-$ROS_DISTRO-py-trees \
+    ros-$ROS_DISTRO-py-trees-ros \
+    ros-$ROS_DISTRO-octomap-server \
+    ros-$ROS_DISTRO-octomap-msgs \
+    ros-$ROS_DISTRO-joy \
+    ros-$ROS_DISTRO-teleop-twist-joy
+
+USER root
+
+RUN git clone https://github.com/kimushun1101/ros2-aliases.git /home/dev/ros2-aliases 
+COPY docker/ros2aliases.env /home/dev/ros2-aliases/.env
+
+# install NVIDIA software
+RUN apt-get update \
+    && apt-get -y --quiet --no-install-recommends install \
+    libglvnd0 \
+    libgl1 \
+    libglx0 \
+    libegl1 \
+    libxext6 \
+    libx11-6 \
+    && rm -rf /var/lib/apt/lists/*
+
+# only on server
+# RUN apt-get update \
+#     && apt-get -y --quiet --no-install-recommends install \
+#     libnvidia-gl-535 \
+#     && rm -rf /var/lib/apt/lists/*
+
+
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=graphics,utility,compute
+ENV QT_X11_NO_MITSHM=1
+
+# Install ZED SDK (required by zed_components / zed-ros2-wrapper humble-v5.1.0)
+# CUDA/L4T userspace libs are provided by the host at runtime (see docker-compose-jetson.yaml),
+# not baked into this image, hence --skip_cuda.
+ENV LOGNAME=root
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y \
+    lsb-release wget less zstd udev apt-transport-https \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG ZED_SDK_VERSION=5.1.2
+RUN wget -q --tries=3 -O /tmp/ZED_SDK_Linux.run "https://download.stereolabs.com/zedsdk/${ZED_SDK_VERSION}/l4t36.3/jetsons" \
+    && chmod +x /tmp/ZED_SDK_Linux.run \
+    && /tmp/ZED_SDK_Linux.run silent skip_drivers skip_cuda skip_python \
+    && rm -rf /usr/local/zed/resources/* \
+    && rm -f /tmp/ZED_SDK_Linux.run \
+    && grep -q "PACKAGE_VERSION \"${ZED_SDK_VERSION}\"" /usr/local/zed/zed-config-version.cmake
+
+RUN ln -sf /usr/lib/aarch64-linux-gnu/tegra/libv4l2.so.0 /usr/lib/aarch64-linux-gnu/libv4l2.so
+
+# zed-config.cmake only auto-resolves via CMAKE_MODULE_PATH if ZED_DIR is set;
+# zed-ros2-wrapper's find_package(ZED REQUIRED) doesn't set it itself.
+ENV ZED_DIR=/usr/local/zed
+
+# CUDA itself is injected at container runtime by nvidia-container-runtime (CSV mounts),
+# not through a proper .deb install, so no /etc/ld.so.conf.d entry or ldconfig cache
+# exists for it. libcuda.so still resolves fine (linker searches its mounted path
+# directly), but libcudart.so does not, so the ZED SDK fails to find a GPU at runtime
+# unless it's explicitly on LD_LIBRARY_PATH.
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
+
+# Install stonefish library
+
+RUN apt-get update && apt-get install -y \
+    python3 python3-pip python3-venv \
+    git cmake build-essential \
+    libopencv-dev libglm-dev libsdl2-dev libfreetype6-dev doxygen \
+    libx11-dev x11-apps \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN sed -i 's/-lSDL2 /-lSDL2/' /usr/lib/aarch64-linux-gnu/cmake/SDL2/sdl2-config.cmake
+
+RUN git clone --branch agh-marines-branch https://github.com/AGH-Marines/stonefish.git  /home/$USERNAME/stonefish \
+    && cd /home/$USERNAME/stonefish \
+    && mkdir build \ 
+    && cd build \
+    && cmake .. \
+    && make -j$(nproc) \
+    && make install \
+    && export LD_LIBRARY_PATH=/home/$USERNAME/stonefish/build/libStonefish.so:$LD_LIBRARY_PATH
+
+RUN mkdir -p /home/$USERNAME/ros2_ws
+RUN chown -R ${USERNAME}:root /home/${USERNAME}/ros2_ws
+
+# Clone packages for developement
+
+## Dualshock 4 driver and package
+RUN sudo pip3 install ds4drv
+RUN sudo pip3 install osqp
+RUN sudo pip3 install casadi
+
+## Download uard
+RUN sudo pip3 install pyserial
+
+USER ${USERNAME}
+
+USER root
+
+WORKDIR /home/$USERNAME/ros2_ws/src
+
+
+RUN echo 'source /opt/ros/'$ROS_DISTRO'/setup.bash' >> /home/$USERNAME/.bashrc \
+    && echo 'source /home/'$USERNAME'/ros2-aliases/ros2_aliases.bash' >> /home/$USERNAME/.bashrc \
+    && echo 'source /home/'$USERNAME'/ros2_ws/install/setup.bash' >> /home/$USERNAME/.bashrc
+
+
+# Install crush
+
+RUN sudo mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://repo.charm.sh/apt/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" | sudo tee /etc/apt/sources.list.d/charm.list \
+    && sudo apt update && sudo apt install crush
+
+# Docker only auto-creates missing bind-mount destinations as directories, but
+# /tmp/argus_socket is a unix socket on the host (created by nvargus-daemon), so
+# the mount point must exist as a regular file beforehand or the bind mount fails
+# with "not a directory".
+RUN touch /tmp/argus_socket
+
+COPY docker/entrypoint.sh /entrypoint.sh
+COPY  . /home/$USERNAME/ros2_ws/
+WORKDIR /home/$USERNAME/ros2_ws/
+RUN rosdep update
+RUN rosdep install --from-paths src --ignore-src -r -y
+ENTRYPOINT ["/entrypoint.sh"]
+
+CMD ["bash"]

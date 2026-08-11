@@ -26,6 +26,8 @@ setup(
     entry_points={
         'console_scripts': [
             'pid_controller = rov_control.pid_controller_node:main',
+            'rov_teleop = rov_control.rov_teleop:main',
+            'manual_wrench = rov_control.manual_wrench_node:main',
         ],
     },
 )

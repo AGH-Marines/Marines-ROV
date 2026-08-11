@@ -8,6 +8,13 @@ def generate_launch_description():
     map_frame_arg = DeclareLaunchArgument('map_frame', default_value='odom')
     map_frame = LaunchConfiguration('map_frame')
 
+    cloud_in_arg = DeclareLaunchArgument(
+        'cloud_in', default_value='/marines_rov/point_cloud',
+        description='PointCloud2 source for octomap_server, e.g. '
+                     '/marines_rov/point_cloud (simulated multibeam) or '
+                     '/zed/zed_node/point_cloud/cloud_registered (real ZED)')
+    cloud_in = LaunchConfiguration('cloud_in')
+
     multibeam_static_tf = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
@@ -35,11 +42,11 @@ def generate_launch_description():
             'occupancy_max_z': 1.0,
             'latch': False,
         }],
-        remappings=[('cloud_in', '/marines_rov/point_cloud')],
+        remappings=[('cloud_in', cloud_in)],
     )
 
     return LaunchDescription([
-        map_frame_arg,
+        map_frame_arg, cloud_in_arg,
         multibeam_static_tf,
         octomap_server_node,
     ])
