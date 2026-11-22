@@ -14,7 +14,7 @@ class KeyboardTeleop(Node):
         self.root = tk.Tk()
         self.root.title('ROV keyboard teleop')
         self.root.geometry('320x200') 
-        self.label = tk.Label(self.root, text='Control the ROV')
+        self.label = tk.Label(self.root, text='Click here to control the ROV')
         self.label.pack(expand=True)   
 
 
@@ -24,6 +24,9 @@ class KeyboardTeleop(Node):
 
         self.root.bind('<KeyPress>', self.on_key_press)
         self.root.bind('<KeyRelease>', self.on_key_release)
+
+        self.root.bind('<FocusIn>', self.on_focus_in)
+        self.root.bind('<FocusOut>', self.on_focus_out)
 
         #window itself calls send_command every 50ms
         self.root.after(50, self.send_command) 
@@ -46,13 +49,23 @@ class KeyboardTeleop(Node):
         if key == 'space':
             self.pressed_keys.clear()  # Clear all pressed keys
         else:
-            self.pressed_keys.add(event.keysym)
+            self.pressed_keys.add(key)
         
 
     def on_key_release(self, event):
         key = event.keysym.lower() 
 
         self.pressed_keys.discard(key)
+
+    def on_focus_out(self, event):
+        self.pressed_keys.clear()  # Clear all pressed keys when focus is lost
+        self.label.config(text='Click here to control the ROV')
+        
+
+    def on_focus_in(self, event):
+        self.label.config(text='ACTIVE\nW/S forward/back  A/D left/right\nR/F up/down  Q/E turn\nSPACE stop')
+      
+
 
     def on_close(self):
         self.publisher.publish(Twist())          
