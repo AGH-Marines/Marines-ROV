@@ -28,6 +28,7 @@ setup(
             'pid_controller = rov_control.pid_controller_node:main',
             'rov_teleop = rov_control.rov_teleop:main',
             'manual_wrench = rov_control.manual_wrench_node:main',
+            'keyboard_teleop = rov_control.keyboard_teleop:main',
         ],
     },
 )
