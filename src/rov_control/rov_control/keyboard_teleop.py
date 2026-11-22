@@ -34,10 +34,12 @@ class KeyboardTeleop(Node):
     def send_command(self):
         twist = Twist() 
 
+        # +y = right, +z = down, +yaw = turn right, +x = forward
+
         twist.linear.x = float('w' in self.pressed_keys) - float('s' in self.pressed_keys)   # forward/ backward
-        twist.linear.y = float('a' in self.pressed_keys) - float('d' in self.pressed_keys)   # left/ right
-        twist.linear.z = float('r' in self.pressed_keys) - float('f' in self.pressed_keys)   # up/ down
-        twist.angular.z = float('q' in self.pressed_keys) - float('e' in self.pressed_keys)  # turn left/ right
+        twist.linear.y = float('d' in self.pressed_keys) - float('a' in self.pressed_keys)   # left/ right
+        twist.linear.z = float('f' in self.pressed_keys) - float('r' in self.pressed_keys)   # up/ down
+        twist.angular.z = float('e' in self.pressed_keys) - float('q' in self.pressed_keys)  # turn left/ right
 
         self.publisher.publish(twist)
         self.root.after(50, self.send_command)  # Schedule the next call  
