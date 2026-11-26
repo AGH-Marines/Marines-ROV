@@ -133,6 +133,11 @@ Uruchamia Stonefish, EKF, OctoMap, regulator PID, alokator pędników, obsługę
 ```bash
 ros2 launch rov_bringup teleop_joy.launch.py use_sim:=true enable_mapping:=true
 ```
+Sterowanie z klawiatury . Klawisze działają przy aktywnym oknie, a kliknięcie w inne okno zatrzymuje robota:
+
+```bash
+ros2 launch rov_bringup teleop_keyboard.launch.py use_sim:=true enable_mapping:=true
+```
 
 Domyślnie ładowany jest świat `underwater`. Aby włączyć sam symulator z innym światem:
 
